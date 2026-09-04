@@ -83,6 +83,58 @@ describe('best-lowcode-installer', () => {
     expect(calls.some(([command, args]) => command === 'codex' && args.includes('add'))).toBe(false)
   })
 
+  it('re-registers only existing BEST MCP entries when repairMcp is enabled', async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), 'best-lowcode-installer-'))
+    const { runner, calls } = runnerWith((command, args) => {
+      if (command === 'npm' && args[0] === 'prefix') return { ok: true, stdout: '/usr/local\n', stderr: '' }
+      if (command === 'codex' && args.includes('list')) return { ok: true, stdout: 'best-lowcode\n', stderr: '' }
+      if (args.includes('list')) return { ok: true, stdout: 'other-server\n', stderr: '' }
+      return { ok: true, stdout: '', stderr: '' }
+    })
+
+    const result = await installBestLowcode({
+      homeDir,
+      repairMcp: true,
+      runner,
+      skillSourceDir: skillSource
+    })
+
+    expect(result.hosts).toEqual([
+      { host: 'codex', skill: 'installed', mcp: 'repaired' },
+      { host: 'cursor', skill: 'installed', mcp: 'installed' },
+      { host: 'claude-code', skill: 'installed', mcp: 'installed' }
+    ])
+    expect(calls).toContainEqual(['codex', ['mcp', 'remove', 'best-lowcode']])
+    expect(calls).toContainEqual(['codex', ['mcp', 'add', 'best-lowcode', '--', '/usr/local/bin/best-lowcode-mcp']])
+  })
+
+  it('does not re-add an MCP entry when its removal fails during repair', async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), 'best-lowcode-installer-'))
+    const { runner, calls } = runnerWith((command, args) => {
+      if (command === 'npm' && args[0] === 'prefix') return { ok: true, stdout: '/usr/local\n', stderr: '' }
+      if (command === 'codex' && args.includes('list')) return { ok: true, stdout: 'best-lowcode\n', stderr: '' }
+      if (command === 'codex' && args.includes('remove')) return { ok: false, stdout: '', stderr: 'permission denied' }
+      if (args.includes('list')) return { ok: true, stdout: 'other-server\n', stderr: '' }
+      return { ok: true, stdout: '', stderr: '' }
+    })
+
+    const result = await installBestLowcode({
+      homeDir,
+      repairMcp: true,
+      runner,
+      skillSourceDir: skillSource
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.hosts[0]).toEqual({
+      host: 'codex',
+      skill: 'installed',
+      mcp: 'failed',
+      message: 'codex MCP 移除失败：permission denied'
+    })
+    expect(calls.some(([command, args]) => command === 'codex' && args.includes('add'))).toBe(false)
+  })
+
   it('stops before touching host configuration when global DevTools installation fails', async () => {
     const homeDir = await mkdtemp(join(tmpdir(), 'best-lowcode-installer-'))
     const { runner, calls } = runnerWith(() => ({ ok: false, stdout: '', stderr: 'network unavailable' }))

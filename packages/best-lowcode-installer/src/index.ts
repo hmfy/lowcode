@@ -16,6 +16,7 @@ export type CommandResult = { ok: boolean; stdout: string; stderr: string }
 export type CommandRunner = (command: string, args: string[]) => Promise<CommandResult>
 export type InstallStatus =
   | 'installed'
+  | 'repaired'
   | 'already-registered'
   | 'skipped'
   | 'failed'
@@ -39,6 +40,7 @@ export type InstallerOptions = {
   devtoolsVersion?: string
   homeDir?: string
   platform?: NodeJS.Platform
+  repairMcp?: boolean
   runner?: CommandRunner
   skillSourceDir?: string
 }
@@ -48,6 +50,7 @@ type HostDefinition = {
   command: string
   skillRelativePath: string[]
   registrationArgs: (mcpCommand: string) => string[]
+  removalArgs: () => string[]
 }
 
 const HOSTS: HostDefinition[] = [
@@ -55,13 +58,15 @@ const HOSTS: HostDefinition[] = [
     id: 'codex',
     command: 'codex',
     skillRelativePath: ['.codex', 'skills', MCP_SERVER_NAME],
-    registrationArgs: (mcpCommand) => ['mcp', 'add', MCP_SERVER_NAME, '--', mcpCommand]
+    registrationArgs: (mcpCommand) => ['mcp', 'add', MCP_SERVER_NAME, '--', mcpCommand],
+    removalArgs: () => ['mcp', 'remove', MCP_SERVER_NAME]
   },
   {
     id: 'cursor',
     command: 'agent',
     skillRelativePath: ['.cursor', 'skills', MCP_SERVER_NAME],
-    registrationArgs: (mcpCommand) => ['mcp', 'add', MCP_SERVER_NAME, '--', mcpCommand]
+    registrationArgs: (mcpCommand) => ['mcp', 'add', MCP_SERVER_NAME, '--', mcpCommand],
+    removalArgs: () => ['mcp', 'remove', MCP_SERVER_NAME]
   },
   {
     id: 'claude-code',
@@ -77,7 +82,8 @@ const HOSTS: HostDefinition[] = [
       MCP_SERVER_NAME,
       '--',
       mcpCommand
-    ]
+    ],
+    removalArgs: () => ['mcp', 'remove', MCP_SERVER_NAME]
   }
 ]
 
@@ -126,7 +132,8 @@ async function installSkill(source: string, destination: string, host: Supported
 async function registerHost(
   host: HostDefinition,
   runner: CommandRunner,
-  mcpCommand: string
+  mcpCommand: string,
+  repairMcp: boolean
 ): Promise<Pick<HostInstallResult, 'mcp' | 'message'>> {
   const available = await runner(host.command, ['--version'])
   if (!available.ok) {
@@ -140,18 +147,29 @@ async function registerHost(
       message: `${host.command} mcp list 执行失败：${listed.stderr || listed.stdout}`
     }
   }
-  if (hasRegisteredServer(listed)) {
+  const registered = hasRegisteredServer(listed)
+  if (registered && !repairMcp) {
     return { mcp: 'already-registered' }
   }
 
-  const registered = await runner(host.command, host.registrationArgs(mcpCommand))
-  if (!registered.ok) {
-    return {
-      mcp: 'failed',
-      message: `${host.command} MCP 注册失败：${registered.stderr || registered.stdout}`
+  if (registered) {
+    const removed = await runner(host.command, host.removalArgs())
+    if (!removed.ok) {
+      return {
+        mcp: 'failed',
+        message: `${host.command} MCP 移除失败：${removed.stderr || removed.stdout}`
+      }
     }
   }
-  return { mcp: 'installed' }
+
+  const added = await runner(host.command, host.registrationArgs(mcpCommand))
+  if (!added.ok) {
+    return {
+      mcp: 'failed',
+      message: `${host.command} MCP 注册失败：${added.stderr || added.stdout}`
+    }
+  }
+  return { mcp: registered ? 'repaired' : 'installed' }
 }
 
 export async function installBestLowcode(options: InstallerOptions = {}): Promise<InstallerResult> {
@@ -195,7 +213,7 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
           message: `Skill 安装失败：${error instanceof Error ? error.message : '未知错误'}`
         }
       }
-      const registration = await registerHost(host, runner, mcpCommand)
+      const registration = await registerHost(host, runner, mcpCommand, options.repairMcp ?? false)
       return { host: host.id, skill: 'installed', ...registration }
     })
   )
@@ -208,7 +226,9 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
 }
 
 function usage(write: (value: string) => void) {
-  write('Usage:\n  npx best-lowcode-installer [install] [--devtools-version <version>]\n')
+  write(
+    'Usage:\n  npx best-lowcode-installer [install] [--devtools-version <version>] [--repair-mcp]\n'
+  )
 }
 
 export async function runInstallerCli(
@@ -223,13 +243,23 @@ export async function runInstallerCli(
     usage(io.stdout)
     return 0
   }
-  const hasVersion =
-    args.length === 2 && args[0] === '--devtools-version' && Boolean(args[1])
-  if (args.length !== 0 && !hasVersion) {
+  let devtoolsVersion: string | undefined
+  let repairMcp = false
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index]
+    if (arg === '--repair-mcp') {
+      repairMcp = true
+      continue
+    }
+    if (arg === '--devtools-version' && args[index + 1]) {
+      devtoolsVersion = args[index + 1]
+      index += 1
+      continue
+    }
     usage(io.stderr)
     return 1
   }
-  const result = await installBestLowcode({ devtoolsVersion: hasVersion ? args[1] : undefined })
+  const result = await installBestLowcode({ devtoolsVersion, repairMcp })
   io.stdout(`${JSON.stringify(result, null, 2)}\n`)
   return result.ok ? 0 : 1
 }
