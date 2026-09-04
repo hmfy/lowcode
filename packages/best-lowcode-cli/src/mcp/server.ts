@@ -46,7 +46,7 @@ export function createBestLowcodeMcpServer(rootDir: string | undefined, adapter?
     return createBestLowcodeMcpService(projectRoot, adapter)
   }
   const server = new Server(
-    { name: 'best-lowcode-devtools', version: '0.1.0' },
+    { name: 'best-lowcode-devtools', version: '0.2.0' },
     { capabilities: { tools: {} } }
   )
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
