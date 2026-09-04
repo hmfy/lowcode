@@ -5,7 +5,7 @@ import type {
   CapabilityContext,
   ProjectConfig,
   RequirementCoverage,
-  SemanticSelection
+  TaskSelection
 } from './types'
 
 export function describeCapabilities(contexts: CapabilityContext[], builtInCapabilities: string[]) {
@@ -101,17 +101,6 @@ function isLowcodeOptOutRequest(request: string) {
   )
 }
 
-function isFuzzyReuseQuestion(question: string) {
-  const normalized = question.toLocaleLowerCase()
-  const asksReuse =
-    normalized.includes('复用') || normalized.includes('reuse') || normalized.includes('使用')
-  const asksMapping = normalized.includes('对应') || normalized.includes('关联')
-  const mentionsExisting =
-    normalized.includes('现有') || normalized.includes('existing') || normalized.includes('已有')
-  const mentionsCapability = normalized.includes('能力') || normalized.includes('capability')
-  return mentionsCapability && (asksReuse || (asksMapping && mentionsExisting))
-}
-
 function schemaFileName(pattern?: string) {
   if (!pattern || pattern.includes('*')) return 'schema.ts'
   const name = posix.basename(pattern)
@@ -127,6 +116,10 @@ function inferPageRoot(paths: string[]) {
   if (srcPath) return posix.join(srcPath, 'pages')
   const appPath = paths.find((path) => path.startsWith('apps/') || path === 'apps')
   return appPath ? posix.join(appPath, 'src/pages') : (paths[0] ?? '')
+}
+
+function selectedPageDirectory(paths: string[]) {
+  return paths.find((path) => /(^|\/)src\/pages\/[^/]+$/.test(path))
 }
 
 function isWithinAllowedPath(targetPath: string, allowedPaths: string[]) {
@@ -239,7 +232,11 @@ function buildPageContext(
   relatedCapabilities: string[],
   allowedPaths: string[]
 ): { pageContext: AgentTask['pageContext']; blockedQuestion?: string } {
-  const pageName = pageNameFromRequest(request) ?? pageNameFromCapabilities(relatedCapabilities)
+  const selectedPageDir = selectedPageDirectory(allowedPaths)
+  const selectedPageName = selectedPageDir ? posix.basename(selectedPageDir) : undefined
+  const pageName =
+    pageNameFromRequest(request) ?? pageNameFromCapabilities(relatedCapabilities) ??
+    selectedPageName
   const recommendedTemplate = isCreatePageRequest(request) ? ('crud' as const) : undefined
   const manifestPath = config.manifestPaths.length === 1 ? config.manifestPaths[0] : undefined
   if (!pageName) {
@@ -252,8 +249,12 @@ function buildPageContext(
       }
     }
   }
-  const pageRoot = inferPageRoot(allowedPaths.length ? allowedPaths : config.allowedPaths)
-  const pageDir = posix.join(pageRoot, pageName)
+  const selectedPageDirForTask =
+    selectedPageDir && pageName === selectedPageName ? selectedPageDir : undefined
+  const pageRoot = selectedPageDirForTask
+    ? posix.dirname(selectedPageDirForTask)
+    : inferPageRoot(allowedPaths.length ? allowedPaths : config.allowedPaths)
+  const pageDir = selectedPageDirForTask ?? posix.join(pageRoot, pageName)
   if (!isWithinAllowedPath(pageDir, allowedPaths)) {
     return {
       pageContext: {
@@ -292,7 +293,7 @@ export function prepareTask(
   config: ProjectConfig,
   contexts: CapabilityContext[],
   builtInCapabilities: string[] = [],
-  selection?: SemanticSelection
+  selection?: TaskSelection
 ): AgentTask {
   const normalizedRequest = request.trim().toLocaleLowerCase()
   const isInfrastructureMaintenance = isInfrastructureMaintenanceRequest(request)
@@ -310,37 +311,16 @@ export function prepareTask(
         requestTerms.some((term) => Boolean(description?.includes(term)))
     )
     .map(({ id }) => id)
-  let questions: string[] = isInfrastructureMaintenance
-    ? []
-    : selection
-      ? [...selection.questions]
-      : []
+  const questions: string[] = []
   const canScaffoldNewPage = isCreatePageRequest(request) && Boolean(pageNameFromRequest(request))
+  const hasValidatedSelection = selection !== undefined
   const selectedCapabilities = selection?.relatedCapabilities ?? fallbackCapabilities
-  const relatedCapabilities =
-    canScaffoldNewPage && selection
-      ? selectedCapabilities.filter((capability) =>
-          normalizedRequest.includes(capability.toLocaleLowerCase())
-        )
-      : selectedCapabilities
-  if (canScaffoldNewPage && selection) {
-    const filteredCapabilities = selectedCapabilities.filter(
-      (id) => !relatedCapabilities.includes(id)
-    )
-    questions = relatedCapabilities.length
-      ? questions.filter(
-          (question) =>
-            !isFuzzyReuseQuestion(question) &&
-            !filteredCapabilities.some((capability) =>
-              question.toLocaleLowerCase().includes(capability.toLocaleLowerCase())
-            )
-        )
-      : []
-  }
+  const relatedCapabilities = selectedCapabilities
   if (!normalizedRequest) questions.push('请提供需要实现或调整的页面需求。')
   if (
     !relatedCapabilities.length &&
     normalizedRequest &&
+    hasValidatedSelection &&
     !canScaffoldNewPage &&
     !isInfrastructureMaintenance
   ) {
@@ -369,6 +349,7 @@ export function prepareTask(
   if (
     !isInfrastructureMaintenance &&
     !isLowcodeOptOut &&
+    hasValidatedSelection &&
     !pageContextResult.blockedQuestion &&
     !pageContextResult.pageContext.pageDir
   ) {

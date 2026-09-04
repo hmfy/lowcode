@@ -42,11 +42,11 @@ describe('project config', () => {
     expect(result.diagnostics).toContainEqual(
       expect.objectContaining({
         code: 'config.missing',
-        message: expect.stringContaining('best init --write'),
+        message: expect.stringContaining('best_configure_project'),
         recovery: {
-          command: 'pnpm exec best init --write',
+          command: 'best init --write',
           requiresUserApproval: true,
-          retryTool: 'best_prepare_task'
+          retryTool: 'best_configure_project'
         }
       })
     )
@@ -61,11 +61,7 @@ describe('project config', () => {
       diagnostics: [
         {
           code: 'config.missing',
-          recovery: {
-            command: 'pnpm exec best init --write',
-            requiresUserApproval: true,
-            retryTool: 'best_prepare_task'
-          }
+          recovery: { retryTool: 'best_configure_project' }
         }
       ]
     })

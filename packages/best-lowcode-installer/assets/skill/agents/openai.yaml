@@ -1,0 +1,6 @@
+interface:
+  display_name: BEST Low-code
+  short_description: Implement explicitly requested BEST low-code features.
+  default_prompt: Use $best-lowcode to implement this feature with BEST low-code.
+policy:
+  allow_implicit_invocation: false

@@ -68,7 +68,7 @@ describe('prepareTask', () => {
     expect(task.requiredArchitecture).toEqual({ kind: 'none', files: [] })
   })
 
-  it('blocks default low-code work until it can determine the target page directory', () => {
+  it('blocks a validated low-code selection until it can determine the target page directory', () => {
     const task = prepareTask(
       '调整客户管理功能',
       {
@@ -76,7 +76,9 @@ describe('prepareTask', () => {
         allowedPaths: ['apps/demo/src/pages'],
         manifestPaths: ['apps/demo/lowcode.manifest.json']
       },
-      []
+      [],
+      [],
+      { relatedCapabilities: [], allowedPaths: ['apps/demo/src/pages'] }
     )
 
     expect(task.questions).toContain(
@@ -185,8 +187,7 @@ describe('prepareTask', () => {
       [],
       {
         relatedCapabilities: [],
-        allowedPaths: ['packages/best-lowcode-react', 'packages/best-lowcode-cli'],
-        questions: ['未能从需求中确定可用能力，请确认目标页面、服务、字典或动作。']
+        allowedPaths: ['packages/best-lowcode-react', 'packages/best-lowcode-cli']
       }
     )
 
