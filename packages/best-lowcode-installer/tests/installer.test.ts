@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEVTOOLS_PACKAGE,
   installBestLowcode,
+  runInstallerCli,
   type CommandResult,
   type CommandRunner
 } from '../src'
@@ -60,6 +61,50 @@ describe('best-lowcode-installer', () => {
     await expect(readFile(join(homeDir, '.claude', 'skills', 'best-lowcode', 'SKILL.md'), 'utf8')).resolves.toContain(
       'disable-model-invocation: true'
     )
+  })
+
+  it('reports installation progress in clear stages', async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), 'best-lowcode-installer-'))
+    const { runner } = runnerWith((command, args) => {
+      if (command === 'npm' && args[0] === 'prefix') return { ok: true, stdout: '/opt/npm\n', stderr: '' }
+      if (args.includes('list')) return { ok: true, stdout: 'no MCP servers\n', stderr: '' }
+      return { ok: true, stdout: '', stderr: '' }
+    })
+    const progress: string[] = []
+
+    await installBestLowcode({
+      homeDir,
+      onProgress: (message) => progress.push(message),
+      runner,
+      skillSourceDir: skillSource
+    })
+
+    expect(progress).toEqual(expect.arrayContaining([
+      '1/3 正在安装全局 DevTools（latest）…',
+      '✓ 全局 DevTools 已安装',
+      '2/3 正在探测 Codex、Cursor 与 Claude Code…',
+      '3/3 正在安装 Skill 并配置 MCP…',
+      '✓ Codex：Skill 已安装，MCP 已注册',
+      '安装完成'
+    ]))
+  })
+
+  it('writes progress before the JSON summary when run through the CLI', async () => {
+    const stdout: string[] = []
+    const exitCode = await runInstallerCli(
+      [],
+      { stdout: (value) => stdout.push(value), stderr: () => undefined },
+      async ({ onProgress }) => {
+        onProgress?.('1/3 正在安装全局 DevTools（latest）…')
+        return { ok: true, devtools: 'installed', hosts: [] }
+      }
+    )
+
+    expect(exitCode).toBe(0)
+    expect(stdout).toEqual([
+      '[best-lowcode] 1/3 正在安装全局 DevTools（latest）…\n',
+      '{\n  "ok": true,\n  "devtools": "installed",\n  "hosts": []\n}\n'
+    ])
   })
 
   it('does not replace an existing MCP registration and skips a missing host without writing its Skill', async () => {

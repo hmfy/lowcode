@@ -7,6 +7,9 @@ for Codex, Cursor, and Claude Code:
 npx -y best-lowcode-installer
 ```
 
+The installer prints concise terminal progress for DevTools installation, host detection, and each
+Skill/MCP configuration step, then prints the full JSON result for scripting.
+
 The installer uses each host's own CLI to register `best-lowcode-mcp`; it does not edit MCP
 configuration files directly. It copies the Skill to `~/.codex/skills`, `~/.cursor/skills`, and
 `~/.claude/skills`. The installer detects each host CLI first and writes a Skill only for an

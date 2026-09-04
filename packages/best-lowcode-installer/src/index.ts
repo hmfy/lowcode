@@ -39,6 +39,7 @@ export type InstallerResult = {
 export type InstallerOptions = {
   devtoolsVersion?: string
   homeDir?: string
+  onProgress?: (message: string) => void
   platform?: NodeJS.Platform
   repairMcp?: boolean
   runner?: CommandRunner
@@ -47,6 +48,7 @@ export type InstallerOptions = {
 
 type HostDefinition = {
   id: SupportedHost
+  label: string
   command: string
   skillRelativePath: string[]
   registrationArgs: (mcpCommand: string) => string[]
@@ -56,6 +58,7 @@ type HostDefinition = {
 const HOSTS: HostDefinition[] = [
   {
     id: 'codex',
+    label: 'Codex',
     command: 'codex',
     skillRelativePath: ['.codex', 'skills', MCP_SERVER_NAME],
     registrationArgs: (mcpCommand) => ['mcp', 'add', MCP_SERVER_NAME, '--', mcpCommand],
@@ -63,6 +66,7 @@ const HOSTS: HostDefinition[] = [
   },
   {
     id: 'cursor',
+    label: 'Cursor',
     command: 'agent',
     skillRelativePath: ['.cursor', 'skills', MCP_SERVER_NAME],
     registrationArgs: (mcpCommand) => ['mcp', 'add', MCP_SERVER_NAME, '--', mcpCommand],
@@ -70,6 +74,7 @@ const HOSTS: HostDefinition[] = [
   },
   {
     id: 'claude-code',
+    label: 'Claude Code',
     command: 'claude',
     skillRelativePath: ['.claude', 'skills', MCP_SERVER_NAME],
     registrationArgs: (mcpCommand) => [
@@ -171,15 +176,34 @@ async function registerHost(
   return { mcp: registered ? 'repaired' : 'installed' }
 }
 
+function hostProgressMessage(host: HostDefinition, result: HostInstallResult) {
+  if (result.skill === 'failed' || result.mcp === 'failed') {
+    return `✗ ${host.label}：${result.message ?? '配置失败'}`
+  }
+  if (result.skill === 'skipped') {
+    return `- ${host.label}：未安装，已跳过`
+  }
+  if (result.mcp === 'repaired') {
+    return `✓ ${host.label}：Skill 已安装，MCP 已修复`
+  }
+  if (result.mcp === 'already-registered') {
+    return `✓ ${host.label}：Skill 已安装，MCP 已存在`
+  }
+  return `✓ ${host.label}：Skill 已安装，MCP 已注册`
+}
+
 export async function installBestLowcode(options: InstallerOptions = {}): Promise<InstallerResult> {
   const runner = options.runner ?? defaultRunner
   const homeDir = options.homeDir ?? homedir()
   const osPlatform = options.platform ?? currentPlatform()
+  const progress = options.onProgress ?? (() => undefined)
   const version = options.devtoolsVersion ?? 'latest'
   const sourceSkill = options.skillSourceDir ?? bundledSkillDirectory()
+  progress(`1/3 正在安装全局 DevTools（${version}）…`)
   const devtoolsInstall = await runner('npm', ['install', '--global', `${DEVTOOLS_PACKAGE}@${version}`])
 
   if (!devtoolsInstall.ok) {
+    progress('✗ 全局 DevTools 安装失败')
     return {
       ok: false,
       devtools: 'failed',
@@ -187,7 +211,9 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
       hosts: []
     }
   }
+  progress('✓ 全局 DevTools 已安装')
 
+  progress('2/3 正在探测 Codex、Cursor 与 Claude Code…')
   const detectedHosts = await Promise.all(
     HOSTS.map(async (host) => ({ host, available: await isHostAvailable(host, runner) }))
   )
@@ -201,7 +227,12 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
     }))
   const availableHosts = detectedHosts.filter(({ available }) => available)
 
+  for (const { host, available } of detectedHosts) {
+    progress(available ? `✓ 检测到 ${host.label}` : `- ${host.label} 未安装，已跳过`)
+  }
+
   if (availableHosts.length === 0) {
+    progress('安装完成：未检测到可配置的宿主环境')
     return {
       ok: true,
       devtools: 'installed',
@@ -211,6 +242,7 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
 
   const prefix = await runner('npm', ['prefix', '--global'])
   if (!prefix.ok || !prefix.stdout.trim()) {
+    progress('✗ 无法解析全局 npm prefix')
     return {
       ok: false,
       devtools: 'installed',
@@ -220,32 +252,38 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
   }
 
   const mcpCommand = globalMcpCommand(prefix.stdout.trim(), osPlatform)
-  const hosts = await Promise.all(
-    availableHosts.map(async ({ host }): Promise<HostInstallResult> => {
-      const destination = join(homeDir, ...host.skillRelativePath)
-      try {
-        await installSkill(sourceSkill, destination, host.id)
-      } catch (error) {
-        return {
-          host: host.id,
-          skill: 'failed',
-          mcp: 'skipped',
-          message: `Skill 安装失败：${error instanceof Error ? error.message : '未知错误'}`
-        }
-      }
+  progress('3/3 正在安装 Skill 并配置 MCP…')
+  const hosts: HostInstallResult[] = []
+  for (const { host } of availableHosts) {
+    progress(`正在配置 ${host.label}…`)
+    const destination = join(homeDir, ...host.skillRelativePath)
+    let result: HostInstallResult
+    try {
+      await installSkill(sourceSkill, destination, host.id)
       const registration = await registerHost(host, runner, mcpCommand, options.repairMcp ?? false)
-      return { host: host.id, skill: 'installed', ...registration }
-    })
-  )
+      result = { host: host.id, skill: 'installed', ...registration }
+    } catch (error) {
+      result = {
+        host: host.id,
+        skill: 'failed',
+        mcp: 'skipped',
+        message: `Skill 安装失败：${error instanceof Error ? error.message : '未知错误'}`
+      }
+    }
+    hosts.push(result)
+    progress(hostProgressMessage(host, result))
+  }
   const hostResults = HOSTS.map((host) =>
     hosts.find((result) => result.host === host.id) ?? unavailableHosts.find((result) => result.host === host.id)!
   )
-  return {
+  const result: InstallerResult = {
     ok: hostResults.every((host) => host.skill !== 'failed' && host.mcp !== 'failed'),
     devtools: 'installed',
     mcpCommand,
     hosts: hostResults
   }
+  progress(result.ok ? '安装完成' : '安装未完成，请查看失败项')
+  return result
 }
 
 function usage(write: (value: string) => void) {
@@ -259,7 +297,8 @@ export async function runInstallerCli(
   io: { stdout: (value: string) => void; stderr: (value: string) => void } = {
     stdout: process.stdout.write.bind(process.stdout),
     stderr: process.stderr.write.bind(process.stderr)
-  }
+  },
+  install: (options: InstallerOptions) => Promise<InstallerResult> = installBestLowcode
 ) {
   const args = argv[0] === 'install' ? argv.slice(1) : argv
   if (args.includes('--help') || args.includes('-h')) {
@@ -282,7 +321,11 @@ export async function runInstallerCli(
     usage(io.stderr)
     return 1
   }
-  const result = await installBestLowcode({ devtoolsVersion, repairMcp })
+  const result = await install({
+    devtoolsVersion,
+    repairMcp,
+    onProgress: (message) => io.stdout(`[best-lowcode] ${message}\n`)
+  })
   io.stdout(`${JSON.stringify(result, null, 2)}\n`)
   return result.ok ? 0 : 1
 }
