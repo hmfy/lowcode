@@ -62,7 +62,7 @@ describe('best-lowcode-installer', () => {
     )
   })
 
-  it('does not replace an existing MCP registration and isolates a missing host', async () => {
+  it('does not replace an existing MCP registration and skips a missing host without writing its Skill', async () => {
     const homeDir = await mkdtemp(join(tmpdir(), 'best-lowcode-installer-'))
     const { runner, calls } = runnerWith((command, args) => {
       if (command === 'npm' && args[0] === 'prefix') return { ok: true, stdout: '/usr/local\n', stderr: '' }
@@ -77,10 +77,34 @@ describe('best-lowcode-installer', () => {
     expect(result.ok).toBe(true)
     expect(result.hosts).toEqual([
       { host: 'codex', skill: 'installed', mcp: 'already-registered' },
-      { host: 'cursor', skill: 'installed', mcp: 'skipped', message: 'agent 未安装或不在 PATH 中' },
+      { host: 'cursor', skill: 'skipped', mcp: 'skipped', message: 'agent 未安装或不在 PATH 中' },
       { host: 'claude-code', skill: 'installed', mcp: 'installed' }
     ])
     expect(calls.some(([command, args]) => command === 'codex' && args.includes('add'))).toBe(false)
+    await expect(access(join(homeDir, '.cursor', 'skills', 'best-lowcode', 'SKILL.md'))).rejects.toThrow()
+  })
+
+  it('installs only the detected host Skill', async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), 'best-lowcode-installer-'))
+    const { runner } = runnerWith((command, args) => {
+      if (command === 'npm' && args[0] === 'prefix') return { ok: true, stdout: '/opt/npm\n', stderr: '' }
+      if ((command === 'agent' || command === 'claude') && args[0] === '--version') {
+        return { ok: false, stdout: '', stderr: 'not found' }
+      }
+      if (args.includes('list')) return { ok: true, stdout: 'no MCP servers\n', stderr: '' }
+      return { ok: true, stdout: '', stderr: '' }
+    })
+
+    const result = await installBestLowcode({ homeDir, runner, skillSourceDir: skillSource })
+
+    expect(result.hosts).toEqual([
+      { host: 'codex', skill: 'installed', mcp: 'installed' },
+      { host: 'cursor', skill: 'skipped', mcp: 'skipped', message: 'agent 未安装或不在 PATH 中' },
+      { host: 'claude-code', skill: 'skipped', mcp: 'skipped', message: 'claude 未安装或不在 PATH 中' }
+    ])
+    await expect(access(join(homeDir, '.codex', 'skills', 'best-lowcode', 'SKILL.md'))).resolves.toBeUndefined()
+    await expect(access(join(homeDir, '.cursor', 'skills', 'best-lowcode', 'SKILL.md'))).rejects.toThrow()
+    await expect(access(join(homeDir, '.claude', 'skills', 'best-lowcode', 'SKILL.md'))).rejects.toThrow()
   })
 
   it('re-registers only existing BEST MCP entries when repairMcp is enabled', async () => {

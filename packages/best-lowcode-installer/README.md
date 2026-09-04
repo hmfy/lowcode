@@ -9,8 +9,9 @@ npx -y best-lowcode-installer
 
 The installer uses each host's own CLI to register `best-lowcode-mcp`; it does not edit MCP
 configuration files directly. It copies the Skill to `~/.codex/skills`, `~/.cursor/skills`, and
-`~/.claude/skills`. Missing host CLIs are reported independently and do not prevent the other
-hosts from being configured.
+`~/.claude/skills`. The installer detects each host CLI first and writes a Skill only for an
+installed host. Missing host CLIs are reported independently and do not prevent the other hosts
+from being configured.
 
 Run the same command again to update the global DevTools and overwrite the bundled Skills. Existing
 MCP entries are intentionally preserved. If the `best-lowcode` MCP entry is unavailable or its

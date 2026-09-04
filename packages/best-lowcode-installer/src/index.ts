@@ -129,17 +129,16 @@ async function installSkill(source: string, destination: string, host: Supported
   await writeFile(skillPath, claudeSkill, 'utf8')
 }
 
+async function isHostAvailable(host: HostDefinition, runner: CommandRunner) {
+  return (await runner(host.command, ['--version'])).ok
+}
+
 async function registerHost(
   host: HostDefinition,
   runner: CommandRunner,
   mcpCommand: string,
   repairMcp: boolean
 ): Promise<Pick<HostInstallResult, 'mcp' | 'message'>> {
-  const available = await runner(host.command, ['--version'])
-  if (!available.ok) {
-    return { mcp: 'skipped', message: `${host.command} 未安装或不在 PATH 中` }
-  }
-
   const listed = await runner(host.command, ['mcp', 'list'])
   if (!listed.ok) {
     return {
@@ -189,6 +188,27 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
     }
   }
 
+  const detectedHosts = await Promise.all(
+    HOSTS.map(async (host) => ({ host, available: await isHostAvailable(host, runner) }))
+  )
+  const unavailableHosts = detectedHosts
+    .filter(({ available }) => !available)
+    .map(({ host }) => ({
+      host: host.id,
+      skill: 'skipped' as const,
+      mcp: 'skipped' as const,
+      message: `${host.command} 未安装或不在 PATH 中`
+    }))
+  const availableHosts = detectedHosts.filter(({ available }) => available)
+
+  if (availableHosts.length === 0) {
+    return {
+      ok: true,
+      devtools: 'installed',
+      hosts: unavailableHosts
+    }
+  }
+
   const prefix = await runner('npm', ['prefix', '--global'])
   if (!prefix.ok || !prefix.stdout.trim()) {
     return {
@@ -201,7 +221,7 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
 
   const mcpCommand = globalMcpCommand(prefix.stdout.trim(), osPlatform)
   const hosts = await Promise.all(
-    HOSTS.map(async (host): Promise<HostInstallResult> => {
+    availableHosts.map(async ({ host }): Promise<HostInstallResult> => {
       const destination = join(homeDir, ...host.skillRelativePath)
       try {
         await installSkill(sourceSkill, destination, host.id)
@@ -217,11 +237,14 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
       return { host: host.id, skill: 'installed', ...registration }
     })
   )
+  const hostResults = HOSTS.map((host) =>
+    hosts.find((result) => result.host === host.id) ?? unavailableHosts.find((result) => result.host === host.id)!
+  )
   return {
-    ok: hosts.every((host) => host.skill !== 'failed' && host.mcp !== 'failed'),
+    ok: hostResults.every((host) => host.skill !== 'failed' && host.mcp !== 'failed'),
     devtools: 'installed',
     mcpCommand,
-    hosts
+    hosts: hostResults
   }
 }
 
