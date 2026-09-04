@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "allowedPaths": [
+    "src"
+  ],
+  "manifestPaths": [
+    "lowcode.manifest.json"
+  ],
+  "schemaFilePattern": "schema.ts",
+  "verificationCommands": [
+    "pnpm typecheck"
+  ]
+}

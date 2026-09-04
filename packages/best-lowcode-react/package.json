@@ -1,0 +1,56 @@
+{
+  "name": "best-lowcode-runtime",
+  "version": "0.2.3",
+  "description": "BEST React low-code runtime, CRUD page renderer, and UI components.",
+  "keywords": [
+    "best",
+    "low-code",
+    "react",
+    "crud",
+    "schema-driven"
+  ],
+  "license": "UNLICENSED",
+  "type": "module",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "types": "./dist/index.d.ts",
+  "sideEffects": [
+    "./dist/index.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./dev": {
+      "types": "./dist/dev.d.ts",
+      "import": "./dist/dev.js"
+    },
+    "./style.css": "./dist/index.css"
+  },
+  "scripts": {
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json && node scripts/bundle.mjs",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "prepack": "pnpm run build",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@ant-design/pro-components": "^3.1.5-0",
+    "antd": "^6.2.1",
+    "dayjs": "^1.11.19",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "esbuild": "^0.28.2",
+    "jsdom": "^26.1.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "services": {
+    "customer.list": {
+      "description": "查询客户分页列表",
+      "inputSchema": {
+        "type": "object",
+        "required": ["page", "pageSize", "filters"],
+        "properties": {
+          "page": {"type": "integer", "minimum": 1},
+          "pageSize": {"type": "integer", "minimum": 1},
+          "filters": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "id": {"type": "string"},
+              "email": {"type": "string"},
+              "status": {"type": "string"},
+              "tag": {"type": "string"},
+              "source": {"type": "string"}
+            }
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["items", "total"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {"type": "string"},
+                "name": {"type": "string"},
+                "email": {"type": "string"},
+                "status": {"type": "string"},
+                "authorized": {"type": "number"},
+                "tag": {"type": "string"},
+                "sourceText": {"type": "string"},
+                "currency": {"type": "string"},
+                "balance": {"type": "number"},
+                "available": {"type": "number"},
+                "createdAt": {"type": "string"}
+              }
+            }
+          },
+          "total": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "customer.detail": {
+      "description": "查询客户详情",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"}, "name": {"type": "string"}, "email": {"type": "string"},
+          "tag": {"type": "string"}, "sourceText": {"type": "string"}, "status": {"type": "string"},
+          "balance": {"type": "number"}, "createdAt": {"type": "string"}
+        }
+      }
+    },
+    "customer.create": {
+      "description": "创建客户",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {}, "email": {}, "password": {}, "notify": {}, "tag": {}, "source": {},
+          "sourcePerson": {}, "sourceChannel": {}, "sourceDescription": {}, "pricingMode": {},
+          "ethocaPrice": {}, "rdrPrice": {}, "cdrnPrice": {}, "tiers": {}
+        }
+      }
+    },
+    "customer.update": {
+      "description": "更新客户",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {}, "name": {}, "email": {}, "password": {}, "notify": {}, "tag": {}, "source": {},
+          "sourcePerson": {}, "sourceChannel": {}, "sourceDescription": {}, "pricingMode": {},
+          "ethocaPrice": {}, "rdrPrice": {}, "cdrnPrice": {}, "tiers": {}
+        }
+      }
+    },
+    "customer.remove": {"description": "删除客户"},
+    "user.search": {"description": "搜索业务人员"},
+    "warning.list": {"description": "查询预警静态分页列表"},
+    "warning.detail": {"description": "查询预警静态详情"},
+    "warning.assign": {"description": "为预警分配客户"},
+    "provider.list": {"description": "查询服务商静态展示列表"},
+    "provider.detail": {"description": "查询服务商静态展示详情"},
+    "provider.update": {"description": "服务商编辑视觉演示，不持久化数据"}
+  },
+  "dictionaries": ["status", "tags", "sources", "channels", "pricingModes", "boolean", "warningTypes", "providers", "processStatuses", "chargeStatuses", "providerStatus"],
+  "actions": ["customer.toggleStatus", "customer.resetPassword"],
+  "slots": ["customer.tieredPricing", "warning.assign", "provider.apiList", "provider.status", "provider.apiInfo"],
+  "access": []
+}
