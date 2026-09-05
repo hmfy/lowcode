@@ -8,8 +8,7 @@
     "installer",
     "mcp",
     "codex",
-    "cursor",
-    "claude-code"
+    "cursor"
   ],
   "license": "UNLICENSED",
   "type": "module",
