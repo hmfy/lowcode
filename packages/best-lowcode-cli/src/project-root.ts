@@ -1,6 +1,6 @@
 import { access } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
-import { DEFAULT_CONFIG_FILE } from './templates'
+import { CONFIG_FILE_NAME } from './mcp/config'
 
 async function exists(path: string) {
   try {
@@ -19,7 +19,7 @@ export async function findDefaultProjectRoot(startDir = process.cwd()): Promise<
   let directory = resolve(startDir)
   let workspaceRoot: string | undefined
   while (true) {
-    if (await exists(join(directory, DEFAULT_CONFIG_FILE))) return directory
+    if (await exists(join(directory, CONFIG_FILE_NAME))) return directory
     if (await exists(join(directory, 'pnpm-workspace.yaml'))) workspaceRoot = directory
     const parent = dirname(directory)
     if (parent === directory) return workspaceRoot ?? resolve(startDir)

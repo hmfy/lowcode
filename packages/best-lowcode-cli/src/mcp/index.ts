@@ -1,4 +1,6 @@
 export { bestLowcodeAdapter } from './adapters/best-lowcode'
+export { configureProject } from '../init'
+export type { ProjectConfigurationResult, ProjectConfigurationSelection } from '../init'
 export {
   CONFIG_FILE_NAME,
   isConfiguredManifestPath,
@@ -16,7 +18,6 @@ export {
 export { syncManifestDiscovery } from './manifest-sync'
 export { previewCandidateChange } from './preview'
 export { scanTypeScriptSchemas } from './schema-scan'
-export { resolveWithLocalCodex } from './semantic'
 export { createBestLowcodeMcpServer, startBestLowcodeMcpServer } from './server'
 export { createBestLowcodeMcpService } from './service'
 export { describeCapabilities, prepareTask } from './task'
@@ -31,10 +32,7 @@ export type {
   DiagnosticLevel,
   LowcodeAdapter,
   ManifestDiscoveryResult,
-  PrepareOptions,
-  PrepareSemanticMode,
   ProjectConfig,
-  SemanticResolver,
-  SemanticSelection,
+  TaskSelection,
   VerificationResult
 } from './types'

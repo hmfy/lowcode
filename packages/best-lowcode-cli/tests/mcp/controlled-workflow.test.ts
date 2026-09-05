@@ -50,13 +50,12 @@ describe('controlled low-code workflow', () => {
 
   it('prepares, previews, and verifies a natural-language request within its guardrails', async () => {
     const root = await createProject()
-    const service = createBestLowcodeMcpService(root, bestLowcodeAdapter, async () => ({
-      relatedCapabilities: ['rps.client-ledger.list', 'builtin.field.dateRange'],
-      allowedPaths: ['apps/rps/src/pages/client-ledger'],
-      questions: []
-    }))
+    const service = createBestLowcodeMcpService(root, bestLowcodeAdapter)
 
-    const prepared = await service.prepareTask('给客户账簿增加日期范围查询')
+    const prepared = await service.validateSelection('给客户账簿增加日期范围查询', {
+      relatedCapabilities: ['rps.client-ledger.list', 'builtin.field.dateRange'],
+      allowedPaths: ['apps/rps/src/pages/client-ledger']
+    })
     expect(prepared.diagnostics).toEqual([])
     expect(prepared.task).toMatchObject({
       request: '给客户账簿增加日期范围查询',

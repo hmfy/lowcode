@@ -40,14 +40,16 @@ describe('best lowcode MCP server', () => {
     await Promise.all(connections.splice(0).map(close))
   })
 
-  it('publishes the five controlled tools with strict input schemas', async () => {
+  it('publishes controlled tools with strict input schemas', async () => {
     const connection = await connectServer()
     connections.push(connection)
 
     const tools = await connection.client.listTools()
     expect(tools.tools.map((tool) => tool.name)).toEqual([
+      'best_configure_project',
       'best_get_context',
       'best_prepare_task',
+      'best_validate_selection',
       'best_preview_change',
       'best_discover_manifest',
       'best_verify'
@@ -63,6 +65,12 @@ describe('best lowcode MCP server', () => {
     ).toMatchObject({
       properties: { language: { enum: ['auto', 'ts', 'json'] } }
     })
+    expect(
+      tools.tools.find((tool) => tool.name === 'best_validate_selection')?.inputSchema
+    ).toMatchObject({
+      additionalProperties: false,
+      required: ['request', 'relatedCapabilities', 'allowedPaths']
+    })
   })
 
   it('returns controlled errors for invalid tool arguments and unknown tools', async () => {
@@ -74,9 +82,58 @@ describe('best lowcode MCP server', () => {
     )
     expect(missingRequest).toEqual({ error: 'request 必须是字符串' })
 
+    const invalidSelection = readText(
+      await connection.client.callTool({
+        name: 'best_validate_selection',
+        arguments: { request: '新增页面', relatedCapabilities: [], allowedPaths: 'apps/demo' }
+      })
+    )
+    expect(invalidSelection).toEqual({ error: 'request、relatedCapabilities 和 allowedPaths 必须有效' })
+
     const unknownTool = readText(
       await connection.client.callTool({ name: 'unknown_tool', arguments: {} })
     )
     expect(unknownTool).toEqual({ error: '不支持的工具：unknown_tool' })
+  })
+
+  it('validates an Agent selection through the MCP transport', async () => {
+    const connection = await connectServer()
+    connections.push(connection)
+
+    const result = readText(
+      await connection.client.callTool({
+        name: 'best_validate_selection',
+        arguments: {
+          request: '新增 customer-list 页面',
+          relatedCapabilities: [],
+          allowedPaths: ['apps/demo']
+        }
+      })
+    )
+
+    expect(result.diagnostics).toEqual([])
+    expect(result.task).toMatchObject({
+      allowedPaths: ['apps/demo'],
+      pageContext: { pageDir: 'apps/demo/src/pages/customer-list' }
+    })
+  })
+
+  it('previews project configuration updates through the MCP transport', async () => {
+    const connection = await connectServer()
+    connections.push(connection)
+
+    const result = readText(
+      await connection.client.callTool({
+        name: 'best_configure_project',
+        arguments: { allowedPaths: ['apps/customer/src/pages'] }
+      })
+    )
+
+    expect(result.written).toBe(false)
+    expect((result.files as Record<string, unknown>[])[0]).toMatchObject({
+      path: 'best.lowcode.config.json',
+      action: 'update'
+    })
+    expect(result.config).toMatchObject({ allowedPaths: ['apps/customer/src/pages'] })
   })
 })

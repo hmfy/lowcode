@@ -1,17 +1,20 @@
+import { exec } from 'node:child_process'
+import { posix } from 'node:path'
+import { promisify } from 'node:util'
+import { configureProject, type ProjectConfigurationSelection } from '../init'
 import { loadProjectConfig } from './config'
 import { hasErrors } from './diagnostics'
 import { loadCapabilityContexts } from './manifest'
 import { syncManifestDiscovery } from './manifest-sync'
 import { previewCandidateChange } from './preview'
+import { checkProjectRuntime } from './runtime'
 import { scanTypeScriptSchemas } from './schema-scan'
-import { resolveWithLocalCodex } from './semantic'
 import { describeCapabilities, prepareTask } from './task'
 import type {
   CandidateLanguage,
+  Diagnostic,
   LowcodeAdapter,
-  PrepareOptions,
-  SemanticResolver,
-  SemanticSelection,
+  TaskSelection,
   VerificationResult
 } from './types'
 
@@ -21,40 +24,73 @@ export type BestLowcodeMcpService = ReturnType<typeof createBestLowcodeMcpServic
 
 export function createBestLowcodeMcpService(
   rootDir: string,
-  adapter?: LowcodeAdapter,
-  semanticResolver?: SemanticResolver
+  adapter?: LowcodeAdapter
 ) {
-  function validateSelection(
-    selection: SemanticSelection,
+  function isWithinAllowedPath(targetPath: string, allowedPaths: string[]) {
+    const normalizedTarget = targetPath.replaceAll('\\', '/')
+    if (
+      !normalizedTarget ||
+      posix.isAbsolute(normalizedTarget) ||
+      normalizedTarget.includes('\0') ||
+      normalizedTarget.split('/').includes('..')
+    ) {
+      return false
+    }
+    return allowedPaths.some((allowedPath) => {
+      const relativePath = posix.relative(allowedPath, normalizedTarget)
+      return (
+        relativePath === '' ||
+        (!relativePath.startsWith('../') && relativePath !== '..' && !posix.isAbsolute(relativePath))
+      )
+    })
+  }
+
+  function validateTaskSelection(
+    selection: TaskSelection,
     allowedPaths: string[],
     capabilityIds: string[],
     manifestPaths: string[]
-  ): string | undefined {
-    if (selection.relatedCapabilities.some((id) => !capabilityIds.includes(id))) {
-      return 'Codex 返回了不在 Manifest 或内置能力清单中的能力 ID'
+  ): Diagnostic[] {
+    const diagnostics: Diagnostic[] = []
+    const unknownCapabilities = selection.relatedCapabilities.filter(
+      (id) => !capabilityIds.includes(id)
+    )
+    if (unknownCapabilities.length) {
+      diagnostics.push({
+        level: 'error',
+        code: 'selection.capability.unknown',
+        message: `存在未在 Manifest 或 Runtime 中声明的能力 ID：${unknownCapabilities.join(', ')}`
+      })
     }
-    if (
-      selection.allowedPaths.some(
-        (path) => !allowedPaths.includes(path) && !manifestPaths.includes(path)
-      )
-    ) {
-      return 'Codex 返回了不在 allowedPaths 白名单中的路径'
+    const disallowedPaths = selection.allowedPaths.filter(
+      (path) => !manifestPaths.includes(path) && !isWithinAllowedPath(path, allowedPaths)
+    )
+    if (disallowedPaths.length) {
+      diagnostics.push({
+        level: 'error',
+        code: 'selection.path.disallowed',
+        message: `存在不在 allowedPaths 白名单中的路径：${disallowedPaths.join(', ')}`
+      })
     }
-    return undefined
+    return diagnostics
   }
   async function readContext() {
     const configResult = await loadProjectConfig(rootDir)
     if (!configResult.config)
       return { config: undefined, contexts: [], diagnostics: configResult.diagnostics }
     const manifests = await loadCapabilityContexts(rootDir, configResult.config.manifestPaths)
+    const runtimeDiagnostics = await checkProjectRuntime(rootDir, configResult.config.allowedPaths)
     return {
       config: configResult.config,
       contexts: manifests.contexts,
-      diagnostics: [...configResult.diagnostics, ...manifests.diagnostics]
+      diagnostics: [...configResult.diagnostics, ...manifests.diagnostics, ...runtimeDiagnostics]
     }
   }
 
   return {
+    async configureProject(selection: Partial<ProjectConfigurationSelection> = {}, write = false) {
+      return configureProject(rootDir, selection, write)
+    },
     async getContext() {
       const context = await readContext()
       return {
@@ -64,58 +100,40 @@ export function createBestLowcodeMcpService(
         diagnostics: context.diagnostics
       }
     },
-    async prepareTask(request: string, options: PrepareOptions = {}) {
+    async prepareTask(request: string) {
+      const context = await readContext()
+      if (!context.config || hasErrors(context.diagnostics)) {
+        return { task: undefined, diagnostics: context.diagnostics }
+      }
+      const builtInCapabilities = adapter?.builtInCapabilities?.() ?? []
+      return {
+        task: prepareTask(request, context.config, context.contexts, builtInCapabilities),
+        diagnostics: context.diagnostics
+      }
+    },
+    async validateSelection(request: string, selection: TaskSelection) {
       const context = await readContext()
       if (!context.config) return { task: undefined, diagnostics: context.diagnostics }
       const builtInCapabilities = adapter?.builtInCapabilities?.() ?? []
-      const diagnostics = [...context.diagnostics]
-      let selection: SemanticSelection | undefined
-      const semantic = options.semantic ?? 'codex'
-      if (semantic === 'codex') {
-        try {
-          const resolver = semanticResolver ?? ((input) => resolveWithLocalCodex(rootDir, input))
-          const result = await resolver({
-            request,
-            allowedPaths: context.config.allowedPaths,
-            capabilities: describeCapabilities(context.contexts, builtInCapabilities)
-          })
-          const selectionError = validateSelection(
-            result,
-            context.config.allowedPaths,
-            describeCapabilities(context.contexts, builtInCapabilities).map(({ id }) => id),
-            context.config.manifestPaths
-          )
-          if (selectionError) {
-            diagnostics.push({
-              level: 'warning',
-              code: 'semantic.rejected',
-              message: selectionError
-            })
-          } else {
-            selection = {
-              ...result,
-              // Manifest is a separately controlled capability file, not a business write path.
-              allowedPaths: result.allowedPaths.filter(
-                (path) => !context.config?.manifestPaths.includes(path)
-              )
-            }
-          }
-        } catch (error) {
-          diagnostics.push({
-            level: 'warning',
-            code: 'semantic.fallback',
-            message: `Codex 语义解析不可用，已回退到确定性匹配：${error instanceof Error ? error.message : '未知错误'}`
-          })
-        }
-      }
+      const capabilityIds = describeCapabilities(context.contexts, builtInCapabilities).map(({ id }) => id)
+      const diagnostics = [
+        ...context.diagnostics,
+        ...validateTaskSelection(
+          selection,
+          context.config.allowedPaths,
+          capabilityIds,
+          context.config.manifestPaths
+        )
+      ]
+      if (hasErrors(diagnostics)) return { task: undefined, diagnostics }
       return {
-        task: prepareTask(
-          request,
-          context.config,
-          context.contexts,
-          builtInCapabilities,
-          selection
-        ),
+        task: prepareTask(request, context.config, context.contexts, builtInCapabilities, {
+          relatedCapabilities: [...new Set(selection.relatedCapabilities)],
+          // Manifest is a separately controlled capability file, not a business write path.
+          allowedPaths: [...new Set(selection.allowedPaths)].filter(
+            (path) => !context.config?.manifestPaths.includes(path)
+          )
+        }),
         diagnostics
       }
     },
@@ -125,7 +143,9 @@ export function createBestLowcodeMcpService(
       language: CandidateLanguage = 'auto'
     ) {
       const context = await readContext()
-      if (!context.config) return { preview: undefined, diagnostics: context.diagnostics }
+      if (!context.config || hasErrors(context.diagnostics)) {
+        return { preview: undefined, diagnostics: context.diagnostics }
+      }
       const preview = await previewCandidateChange(
         rootDir,
         context.config,
@@ -140,6 +160,10 @@ export function createBestLowcodeMcpService(
       const configResult = await loadProjectConfig(rootDir)
       if (!configResult.config) {
         return { written: false, pages: [], diagnostics: configResult.diagnostics }
+      }
+      const runtimeDiagnostics = await checkProjectRuntime(rootDir, configResult.config.allowedPaths)
+      if (hasErrors(runtimeDiagnostics)) {
+        return { written: false, pages: [], diagnostics: [...configResult.diagnostics, ...runtimeDiagnostics] }
       }
       return syncManifestDiscovery(rootDir, configResult.config, write)
     },
@@ -174,5 +198,3 @@ export function createBestLowcodeMcpService(
     }
   }
 }
-import { exec } from 'node:child_process'
-import { promisify } from 'node:util'

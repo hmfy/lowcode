@@ -71,12 +71,12 @@ export async function loadProjectConfig(rootDir: string) {
           diagnostic(
             'error',
             'config.missing',
-            `未找到 ${CONFIG_FILE_NAME}；请先运行 pnpm exec best init --write，或通过 --cwd 指定已初始化的项目目录。`,
+            `未找到 ${CONFIG_FILE_NAME}；请先调用 best_configure_project 预览候选配置并在用户确认后写入，MCP 不可用时使用 best init --write。`,
             undefined,
             {
-              command: 'pnpm exec best init --write',
+              command: 'best init --write',
               requiresUserApproval: true,
-              retryTool: 'best_prepare_task'
+              retryTool: 'best_configure_project'
             }
           )
         ]

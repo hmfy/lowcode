@@ -77,6 +77,15 @@ importers:
         specifier: ^4.20.3
         version: 4.23.13
 
+  packages/best-lowcode-installer:
+    devDependencies:
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
+      tsx:
+        specifier: ^4.20.3
+        version: 4.23.13
+
   packages/best-lowcode-react:
     dependencies:
       '@ant-design/pro-components':

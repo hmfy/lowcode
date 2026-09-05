@@ -90,22 +90,9 @@ export type RequirementCoverage = {
   reason?: string
 }
 
-export type PrepareSemanticMode = 'codex'
-
-export type SemanticSelection = {
+export type TaskSelection = {
   relatedCapabilities: string[]
   allowedPaths: string[]
-  questions: string[]
-}
-
-export type SemanticResolver = (input: {
-  request: string
-  allowedPaths: string[]
-  capabilities: Array<{ id: string; description?: string }>
-}) => Promise<SemanticSelection>
-
-export type PrepareOptions = {
-  semantic?: PrepareSemanticMode
 }
 
 export type CandidatePreview = {

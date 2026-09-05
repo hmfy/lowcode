@@ -1,0 +1,18 @@
+# BEST low-code workflow reference
+
+Use this reference after `$best-lowcode` / `/best-lowcode` has been explicitly invoked.
+
+The MCP-first sequence is `best_prepare_task`, `best_validate_selection`,
+`best_preview_change`, and `best_verify`. Every MCP call includes the absolute `projectRoot`.
+When the MCP server cannot be used, CLI fallback is allowed only for its matching commands:
+`best prepare`, `best validate-selection`, `best preview-change`, and `best verify`. State the MCP
+failure and fallback in the final result.
+
+`best preview-change` takes a candidate file and returns the same non-writing validation/diff
+result as `best_preview_change`.
+
+Use `best_configure_project` to propose a missing or changed project configuration. The current
+Agent selects paths from the project and the explicit low-code request, presents the returned diff,
+then calls the tool with `write: true` only after the user confirms. CLI fallback is `best init`
+with the same `--allowed-paths`, `--manifest-paths`, and `--verification-commands` JSON arrays.
+Runtime installation remains a user-approved project dependency change.

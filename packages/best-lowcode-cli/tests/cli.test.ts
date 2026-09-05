@@ -17,52 +17,79 @@ function createIo() {
 }
 
 describe('best CLI', () => {
-  it('previews init files without writing them', async () => {
+  it('rejects the removed AGENTS.md initialization command', async () => {
     const root = await mkdtemp(join(tmpdir(), 'best-lowcode-cli-'))
     const { io, output } = createIo()
-    await expect(runCli(['init', '--cwd', root], io)).resolves.toBe(0)
-    expect(JSON.parse(output[0] ?? '{}').written).toBe(false)
-    await expect(readFile(join(root, 'best.lowcode.config.json'), 'utf8')).rejects.toThrow()
-  })
-
-  it('writes configuration only when explicitly requested', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-cli-'))
-    const { io } = createIo()
-    await expect(runCli(['init', '--write', '--cwd', root], io)).resolves.toBe(0)
-    await expect(readFile(join(root, 'best.lowcode.config.json'), 'utf8')).resolves.toContain(
-      '"src"'
-    )
-    await expect(readFile(join(root, 'lowcode.manifest.json'), 'utf8')).resolves.toContain(
-      'services'
-    )
-  })
-
-  it('previews Codex low-code rules without writing AGENTS.md', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-cli-'))
-    const { io, output } = createIo()
-    await expect(runCli(['agent', 'init', '--targets', 'codex', '--cwd', root], io)).resolves.toBe(
-      0
-    )
-    const result = JSON.parse(output[0] ?? '{}')
-    expect(result.written).toBe(false)
-    expect(result.files[0].action).toBe('create')
-    await expect(readFile(join(root, 'AGENTS.md'), 'utf8')).rejects.toThrow()
-  })
-
-  it('rejects unsupported agent init arguments', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-cli-'))
-    const { io, output } = createIo()
-    await expect(runCli(['agent', 'init', 'codex', '--cwd', root], io)).resolves.toBe(1)
+    await expect(runCli(['agent', 'init', '--cwd', root], io)).resolves.toBe(1)
     expect(output.join('')).toContain('Usage:')
   })
 
-  it('rejects unknown semantic providers before preparing a task', async () => {
+  it('previews and writes a user-confirmed project configuration', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-cli-'))
+    const preview = createIo()
+    await expect(
+      runCli(['init', '--allowed-paths', '["apps/rps/src/pages"]', '--cwd', root], preview.io)
+    ).resolves.toBe(0)
+    const previewResult = JSON.parse(preview.output[0] ?? '{}')
+    expect(previewResult.written).toBe(false)
+    expect(previewResult.files[0]).toMatchObject({ action: 'create' })
+    await expect(readFile(join(root, 'best.lowcode.config.json'), 'utf8')).rejects.toThrow()
+
+    const write = createIo()
+    await expect(
+      runCli(
+        ['init', '--allowed-paths', '["apps/rps/src/pages"]', '--write', '--cwd', root],
+        write.io
+      )
+    ).resolves.toBe(0)
+    await expect(readFile(join(root, 'best.lowcode.config.json'), 'utf8')).resolves.toContain(
+      'apps/rps/src/pages'
+    )
+    await expect(readFile(join(root, 'lowcode.manifest.json'), 'utf8')).resolves.toContain('"services"')
+  })
+
+  it('rejects the removed semantic provider option', async () => {
     const root = await mkdtemp(join(tmpdir(), 'best-lowcode-cli-'))
     const { io, output } = createIo()
     await expect(
       runCli(['prepare', '新增页面', '--semantic', 'unknown', '--cwd', root], io)
     ).resolves.toBe(1)
     expect(output.join('')).toContain('Usage:')
+  })
+
+  it('previews a candidate file without writing the target file', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-cli-'))
+    await writeFile(
+      join(root, 'package.json'),
+      JSON.stringify({ dependencies: { 'best-lowcode-runtime': 'workspace:*' } })
+    )
+    await writeFile(
+      join(root, 'best.lowcode.config.json'),
+      JSON.stringify({ version: 1, allowedPaths: ['src'], manifestPaths: ['lowcode.manifest.json'] })
+    )
+    await writeFile(join(root, 'lowcode.manifest.json'), '{"version":1}\n')
+    await mkdir(join(root, 'src'), { recursive: true })
+    await writeFile(join(root, 'candidate.json'), '{"version":1,"services":{"customer.list":{}}}\n')
+    const { io, output } = createIo()
+
+    await expect(
+      runCli(
+        [
+          'preview-change',
+          'lowcode.manifest.json',
+          '--candidate-file',
+          'candidate.json',
+          '--language',
+          'json',
+          '--cwd',
+          root
+        ],
+        io
+      )
+    ).resolves.toBe(0)
+
+    expect(JSON.parse(output[0] ?? '{}').preview.diff.before).toContain('"version"')
+    await expect(readFile(join(root, 'lowcode.manifest.json'), 'utf8')).resolves.toBe('{"version":1}\n')
   })
 
   it('finds the workspace root when invoked from a filtered package directory', async () => {

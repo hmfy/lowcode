@@ -10,31 +10,30 @@ or modifying low-code pages.
 
 ## Install
 
-```bash
-npm install -g best-lowcode-devtools
-best --help
-```
-
-Or run without a global installation:
+Use the one-command installer to install the explicit Skill, global DevTools, and user-level MCP
+registrations for Codex, Cursor, and Claude Code:
 
 ```bash
-npx best-lowcode-devtools --help
+npx -y best-lowcode-installer
 ```
+
+It registers MCP with each host's own CLI rather than editing configuration files directly. The
+Skill defaults to MCP; the `best` CLI is the documented fallback when MCP is unavailable.
 
 ## Commands
 
 ```bash
-pnpm --filter best-lowcode-devtools best init
-pnpm --filter best-lowcode-devtools best init --write
 pnpm --filter best-lowcode-devtools best page create customer-list --kind crud --dir apps/demo/src/pages
+pnpm --filter best-lowcode-devtools best init --allowed-paths '["apps/demo/src/pages"]'
+pnpm --filter best-lowcode-devtools best init --allowed-paths '["apps/demo/src/pages"]' --write
 pnpm --filter best-lowcode-devtools best page create customer-list --kind crud --dir apps/demo/src/pages --title 客户列表 --write
 pnpm --filter best-lowcode-devtools best prepare "新增客户账簿筛选条件"
-pnpm --filter best-lowcode-devtools best prepare "给客户账簿增加日期范围查询" --semantic codex
+pnpm --filter best-lowcode-devtools best validate-selection "给客户账簿增加日期范围查询" --related-capabilities '["rps.client-ledger.list"]' --allowed-paths '["apps/rps/src/pages/client-ledger"]'
+pnpm --filter best-lowcode-devtools best preview-change apps/rps/src/pages/client-ledger/schema.ts --candidate-file /tmp/schema.ts --language ts
 pnpm --filter best-lowcode-devtools best verify
 pnpm --filter best-lowcode-devtools best manifest sync --discover
 pnpm --filter best-lowcode-devtools best manifest sync --discover --write
 pnpm --filter best-lowcode-devtools best mcp serve
-pnpm --filter best-lowcode-devtools best agent init --targets codex
 ```
 
 All commands write structured JSON to standard output. `prepare` and `verify` return a non-zero
@@ -42,17 +41,17 @@ exit code when diagnostics contain errors, so they are suitable for CI.
 
 | Command | Behavior | Writes files |
 | --- | --- | --- |
-| `best init` | Previews the project config and empty Manifest templates. | No |
-| `best init --write` | Creates the config and Manifest, but refuses to overwrite either existing file. | Yes |
 | `best page create <name> --kind crud` | Previews a standard CRUD page scaffold with `schema.ts`, `api.ts`, `registry.ts`, and `index.tsx`. | No |
+| `best init [options]` | Previews the project Config/Manifest candidate. | No |
+| `best init [options] --write` | Writes the reviewed Config candidate and only missing empty Manifests. | Yes |
 | `best page create <name> --kind crud --write` | Creates the CRUD page scaffold, but refuses to overwrite existing files. | Yes |
 | `best prepare <request>` | Produces a controlled `AgentTask` from the config and Manifest. | No |
+| `best validate-selection <request> ...` | Validates Agent-selected capabilities and paths, then produces a controlled `AgentTask`. | No |
+| `best preview-change <target-path> --candidate-file <path>` | Validates a candidate Schema or Manifest file and returns a diff without writing it. | No |
 | `best verify` | Validates config, Manifests, and injected primary-package rules. | No |
 | `best manifest sync --discover` | Discovers `BestCrudPage` pages under `allowedPaths` and previews safe Manifest additions. | No |
 | `best manifest sync --discover --write` | Applies the reviewed candidate Manifest additions. | Yes |
-| `best mcp serve` | Starts the internal stdio MCP server for Codex or Cursor. | No |
-| `best agent init --targets codex` | Previews the managed low-code rules for Codex. | No |
-| `best agent init --targets codex --write` | Creates or updates only the managed rule block in `AGENTS.md`. | Yes |
+| `best mcp serve` | Starts the internal stdio MCP server for Codex, Cursor, or Claude Code. | No |
 
 Pass `--cwd <path>` to operate on another repository root. The tool never runs arbitrary shell
 commands and has no arbitrary file-write command.
@@ -85,20 +84,15 @@ apps/demo/src/pages/customer-list/
 Use `--capability-prefix <id>` when the Manifest namespace differs from the page name, for example
 `--capability-prefix rps.customer-list`.
 
-### Local Codex semantics (default)
+### Agent selection validation
 
-`best prepare <request>` asks the locally authenticated Codex CLI to select from the supplied
-Manifest and built-in capability IDs. Passing `--semantic codex` remains supported and is
-equivalent. It runs `codex exec` in a read-only, ephemeral sandbox with a JSON output schema. It
-cannot write project files, call business APIs, or return arbitrary IDs/paths: the CLI checks all
-model selections against the local capability and path allowlists before returning an `AgentTask`.
+`best prepare <request>` only reads the project Config, Manifest, and built-in capabilities. It
+does not start Codex, Cursor, Claude, or any other model CLI. The current Agent interprets the
+request, then calls `best validate-selection` (or MCP `best_validate_selection`) with its selected
+capability IDs and paths. DevTools rejects unknown capabilities and paths outside the allowlist
+before returning an `AgentTask`.
 
-If Codex is unavailable, times out, returns malformed JSON, or selects an unknown capability/path,
-the command returns a `semantic.fallback` or `semantic.rejected` warning and falls back to the
-deterministic ID matching behavior. The local Codex model is selected by the user's Codex CLI
-configuration; this package stores no model credentials or model name.
-
-The returned `AgentTask` also includes deterministic execution hints for agents:
+The returned `AgentTask` includes deterministic execution hints for agents:
 `pageContext`, `capabilityGroups`, `verificationCommands`, and `blockedQuestions`. These fields
 do not grant extra permission; agents must still respect `allowedPaths` and stop when
 `questions` is non-empty.
@@ -114,21 +108,20 @@ before/after diff. Use `--write` only after reviewing that output.
 The first version requires exactly one `manifestPaths` target. Multiple Manifests need an explicit
 page-to-Manifest mapping, which is safer than guessing a destination during whole-project scans.
 
-## Codex rule initialization
+## Explicit Skill activation
 
-`best agent init --targets codex` emits a preview of the `AGENTS.md` change. Add `--write` to
-write it. The command only manages the block between `<!-- best-lowcode:start -->` and
-`<!-- best-lowcode:end -->`; any existing project instructions remain unchanged. The generated
-rules require Codex to call `best_prepare_task` before any repository or browser operation for
-every BEST low-code request—including one-line or style-only changes—respect its allowed paths
-and questions, use the MCP tools when available, and run the declared verification before
-reporting completion. CLI fallback is permitted only after MCP unavailability is explicitly
-reported.
+The installer copies `best-lowcode` into each host's user Skill directory. It is explicit-only:
+invoke `$best-lowcode` in Codex, `/best-lowcode` in Claude Code, or explicitly select it in
+Cursor only for requirements that the user has chosen to build with BEST low-code. It never writes
+rules into the target project's `AGENTS.md`.
 
 ## MCP server
 
-The internal MCP server exposes `best_get_context`, `best_prepare_task`,
-`best_preview_change`, `best_discover_manifest`, and `best_verify`. `best_preview_change` accepts
+The internal MCP server exposes `best_configure_project`, `best_get_context`, `best_prepare_task`,
+`best_validate_selection`, `best_preview_change`, `best_discover_manifest`, and `best_verify`.
+Use `best_configure_project` without `write` to preview a path/Manifest proposal; only call it with
+`write: true` after the user has confirmed that diff.
+`best_preview_change` accepts
 JSON for compatibility and, for `schema.ts`, safely parses the static TypeScript Schema without
 executing it. In automatic mode, `.ts` and `.tsx` candidates are parsed as TypeScript first and
 fall back to JSON only when no valid static Schema can be extracted. It has no shell, arbitrary
@@ -139,7 +132,7 @@ For a global MCP process, omit a fixed repository `cwd`. Every tool call must pr
 configuration and Manifest for the call:
 
 ```toml
-[mcp_servers.best_lowcode]
+[mcp_servers.best-lowcode]
 command = "best-lowcode-mcp"
 args = []
 ```
@@ -156,18 +149,12 @@ For example, `best_prepare_task` receives:
 The legacy fixed-root form remains supported when embedding the server directly, but a global
 MCP client should always pass `projectRoot` so one process can safely serve multiple projects.
 
-## Generated files
+## Project configuration
 
-`best init --write` creates these minimal, safe defaults:
-
-```text
-best.lowcode.config.json
-lowcode.manifest.json
-```
-
-Update `allowedPaths`, `manifestPaths`, and `verificationCommands` before using the tool for an
-application. Business services, permission functions, API URLs, keys, and registry source code
-must not be included in the Manifest.
+DevTools proposes and maintains `best.lowcode.config.json` and its empty Manifest through
+`best_configure_project` (or CLI `best init`). The Skill selects paths from the explicit request,
+shows the candidate diff, and writes only after user confirmation. Business services, permission
+functions, API URLs, keys, and registry source code must not be included in the Manifest.
 
 ## Main-package integration and merge guide
 
@@ -197,7 +184,7 @@ the shared adapter:
 
 | Command | Current baseline | After primary-package integration |
 | --- | --- | --- |
-| `init` | Creates config and empty Manifest templates | May add runtime-supported fixture templates. |
+| Project configuration | Is supplied and reviewed by the project template or maintainer | May add runtime-supported fixture templates. |
 | `prepare` | Uses business Manifest capability IDs | Also includes primary-package built-in capabilities. |
 | `verify` | Checks config and Manifests | Adds Schema, migrations, fixtures, and capability consistency checks. |
 

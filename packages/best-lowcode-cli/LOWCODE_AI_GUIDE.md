@@ -33,7 +33,13 @@ AI 不应绕过这四层边界。
    best prepare "新增客户列表页面"
    ```
 
-   在 Codex 中，优先使用 MCP 的 `best_prepare_task`。如果 MCP 不可用，明确说明后再回退 CLI。
+   读取输出中的 Config、Manifest、内置能力和基础 `AgentTask`。当前 Agent 根据用户需求选择能力 ID 和可能修改的路径后，必须调用 `best_validate_selection` 校验；CLI 等价命令为：
+
+   ```bash
+   best validate-selection "新增客户列表页面" --related-capabilities '[]' --allowed-paths '["src"]'
+   ```
+
+   DevTools 不会启动或依赖 Codex、Cursor、Claude 等模型 CLI。不得猜测未出现在 Manifest 或内置能力中的 ID，也不得选择 Config 白名单外的路径。
 
 2. 处理澄清问题。
 
@@ -343,13 +349,9 @@ Manifest：
 
 `config.missing`
 
-先运行：
-
-```bash
-best init --write
-```
-
-再检查 `allowedPaths`、`manifestPaths`、`schemaFilePattern` 是否符合项目结构。
+先调用 `best_configure_project`（MCP）或 `best init`（CLI）生成候选 Config/Manifest，检查
+`allowedPaths`、`manifestPaths`、`schemaFilePattern` 是否符合项目结构，并向用户展示 diff。
+只有获得用户确认后才使用 `write: true` 或 `--write` 写入。
 
 `page.allowedPath`
 
