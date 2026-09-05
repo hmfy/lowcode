@@ -453,48 +453,6 @@ function usage(write: (value: string) => void) {
 export type InstallerCliIo = {
   stdout: (value: string) => void
   stderr: (value: string) => void
-  isTTY?: boolean
-}
-
-function progressPercentage(message: string) {
-  if (message.startsWith('1/3 ')) return 0
-  if (message.startsWith('2/3 ')) return 33
-  if (message.startsWith('3/3 ')) return 67
-  if (message === '✓ 全局 DevTools 已安装') return 33
-  if (message === '安装完成') return 100
-  return undefined
-}
-
-function progressBar(percentage: number, width = 20) {
-  const completed = Math.round((percentage / 100) * width)
-  return `${'█'.repeat(completed)}${'░'.repeat(width - completed)}`
-}
-
-function createProgressReporter(io: InstallerCliIo) {
-  const isTTY = io.isTTY ?? process.stdout.isTTY ?? false
-  let rendered = false
-
-  return (message: string) => {
-    if (!isTTY) {
-      io.stdout(`[best-lowcode] ${message}\n`)
-      return
-    }
-
-    const percentage = progressPercentage(message)
-    if (percentage === undefined) {
-      if (rendered) io.stdout('\n')
-      io.stdout(`[best-lowcode] ${message}\n`)
-      rendered = false
-      return
-    }
-
-    io.stdout(`\r[best-lowcode] [${progressBar(percentage)}] ${percentage}% ${message}\x1b[K`)
-    rendered = percentage < 100
-    if (message === '✓ 全局 DevTools 已安装' || percentage === 100) {
-      io.stdout('\n')
-      rendered = false
-    }
-  }
 }
 
 export async function runInstallerCli(
@@ -531,14 +489,12 @@ export async function runInstallerCli(
     usage(io.stderr)
     return 1
   }
-  const reportProgress = createProgressReporter(io)
   const result = await install({
     devtoolsVersion,
     cursorConfigFallback,
     repairMcp,
-    onProgress: reportProgress
+    onProgress: (message) => io.stdout(`[best-lowcode] ${message}\n`)
   })
-  if (io.isTTY ?? process.stdout.isTTY) io.stdout('\n')
   io.stdout(`${JSON.stringify(result, null, 2)}\n`)
   return result.ok ? 0 : 1
 }
