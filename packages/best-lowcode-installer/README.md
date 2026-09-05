@@ -7,9 +7,8 @@ for Codex and Cursor:
 npx -y best-lowcode-installer
 ```
 
-The installer renders a dynamic progress bar in an interactive terminal for DevTools installation,
-host detection, and each Skill/MCP configuration step, then prints the full JSON result for
-scripting. Non-interactive output remains line-based for script compatibility.
+The installer prints line-based progress for DevTools installation, host detection, and each
+Skill/MCP configuration step, then prints the full JSON result for scripting.
 
 The installer copies Skills to `~/.codex/skills` and `~/.cursor/skills`. It first prefers the
 native host CLI for MCP registration. If only the desktop client is detected, it uses a

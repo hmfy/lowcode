@@ -242,11 +242,11 @@ describe('best-lowcode-installer', () => {
     ])
   })
 
-  it('renders an inline progress bar for interactive terminals', async () => {
+  it('writes line-based progress for interactive terminals', async () => {
     const stdout: string[] = []
     const exitCode = await runInstallerCli(
       [],
-      { isTTY: true, stdout: (value) => stdout.push(value), stderr: () => undefined },
+      { stdout: (value) => stdout.push(value), stderr: () => undefined },
       async ({ onProgress }) => {
         onProgress?.('1/3 正在安装全局 DevTools（latest）…')
         onProgress?.('✓ 全局 DevTools 已安装')
@@ -258,7 +258,8 @@ describe('best-lowcode-installer', () => {
     )
 
     expect(exitCode).toBe(0)
-    expect(stdout.join('')).toContain('\r[best-lowcode] [████████████████████] 100% 安装完成\x1b[K')
+    expect(stdout.join('')).toContain('[best-lowcode] 安装完成\n')
+    expect(stdout.join('')).not.toContain('%')
     expect(stdout.join('')).toContain('{\n  "ok": true')
   })
 
