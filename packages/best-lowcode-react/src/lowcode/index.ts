@@ -8,6 +8,7 @@ export type {
   DetailFieldSchema,
   FieldSchema,
   FormMode,
+  PageActionButtonType,
   PageActionSchema,
   TableColumnSchema
 } from './schema'

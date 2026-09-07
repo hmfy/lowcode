@@ -132,7 +132,7 @@ export const customerSchema = {
       { id: "remove", label: "删除", effect: "remove" }
     ]
   },
-  toolbar: [{ id: "create", label: "添加客户", effect: "openCreate" }],
+  toolbar: [{ id: "create", label: "添加客户", effect: "openCreate", buttonType: "primary" }],
   detail: {
     fields: [
       { field: "id", label: "商户ID" },

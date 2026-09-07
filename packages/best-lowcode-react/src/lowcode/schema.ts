@@ -60,6 +60,8 @@ export type DetailFieldSchema = {
   slot?: string
 }
 
+export type PageActionButtonType = 'primary' | 'default' | 'link' | 'text' | 'dashed'
+
 export type PageActionSchema = {
   id: string
   label: string
@@ -68,6 +70,8 @@ export type PageActionSchema = {
   slot?: string
   access?: string
   confirm?: string
+  /** Visual button style; omitted actions use the runtime area default. */
+  buttonType?: PageActionButtonType
 }
 
 export type CrudPageSchema = {

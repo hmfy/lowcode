@@ -15,8 +15,8 @@ const spies = vi.hoisted(() => ({
 }))
 
 vi.mock('antd', () => ({
-  Button: ({ children, onClick }: { children: ReactNode; onClick: () => void }) => (
-    <button onClick={onClick} type='button'>
+  Button: ({ children, onClick, type: buttonType }: { children: ReactNode; onClick?: () => void; type?: string }) => (
+    <button onClick={onClick} data-button-type={buttonType} type='button'>
       {children}
     </button>
   ),
@@ -159,6 +159,22 @@ afterEach(() => {
 })
 
 describe('BestCrudPage', () => {
+  it('uses configured action button type and keeps link as the default', () => {
+    const pageSchema = {
+      ...schema,
+      toolbar: [{ id: 'create', label: '新增', effect: 'openCreate', buttonType: 'primary' as const }]
+    } satisfies CrudPageSchema
+    renderSchemaPage(pageSchema, {
+      listServices: { 'customer.list': vi.fn().mockResolvedValue({ items: [], total: 0 }) },
+      services: {
+        'customer.create': vi.fn(),
+        'customer.update': vi.fn(),
+        'customer.remove': vi.fn()
+      }
+    })
+    expect(screen.getByRole('button', { name: '新增' }).getAttribute('data-button-type')).toBe('primary')
+    expect(screen.getByRole('button', { name: '编辑' }).getAttribute('data-button-type')).toBe('link')
+  })
   it('loads records, submits create and edit drawers, and reloads the table', async () => {
     const list = vi.fn().mockResolvedValue({ items: [], total: 0 })
     const create = vi.fn().mockResolvedValue(undefined)

@@ -578,7 +578,7 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
     return (
       <Button
         key={action.id}
-        type='link'
+        type={action.buttonType ?? 'link'}
         onClick={() => {
           void onExecute(action, record)
         }}
