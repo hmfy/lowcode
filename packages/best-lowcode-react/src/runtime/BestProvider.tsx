@@ -10,6 +10,8 @@ export type BestService = (
   options?: { signal?: AbortSignal }
 ) => Promise<unknown>
 export type BestSlotContext = {
+  pageId?: string
+  tabKey?: string
   field?: string
   record?: Record<string, unknown>
   value?: unknown

@@ -5,7 +5,10 @@ import {
   CRUD_SCHEMA_VERSION,
   type CrudPageSchema,
   type FieldSchema,
-  type PageActionSchema
+  type PageActionSchema,
+  TABBED_PAGE_SCHEMA_ID,
+  TABBED_PAGE_SCHEMA_VERSION,
+  type TabbedPageSchema
 } from './schema'
 
 export type SchemaDiagnostic = {
@@ -301,6 +304,49 @@ export function validateCrudPageSchema(
 
 export function assertValidCrudPageSchema(schema: CrudPageSchema, registry?: BestRegistry) {
   const result = validateCrudPageSchema(schema, registry)
+  if (!result.valid) {
+    const message = result.diagnostics.map((item) => `${item.path}: ${item.message}`).join('\n')
+    throw new Error(`Schema 校验失败：\n${message}`)
+  }
+}
+
+export function validateTabbedPageSchema(
+  schema: TabbedPageSchema,
+  registry?: BestRegistry
+): SchemaValidationResult {
+  const diagnostics: SchemaDiagnostic[] = []
+  if (schema.$schema !== TABBED_PAGE_SCHEMA_ID)
+    push(diagnostics, '/$schema', 'schema.id', `仅支持 ${TABBED_PAGE_SCHEMA_ID}`)
+  if (schema.version !== TABBED_PAGE_SCHEMA_VERSION)
+    push(diagnostics, '/version', 'schema.version', `仅支持版本 ${TABBED_PAGE_SCHEMA_VERSION}`)
+  if (!schema.id) push(diagnostics, '/id', 'page.id', '页面 id 不能为空')
+  if (!Array.isArray(schema.tabs) || schema.tabs.length === 0) {
+    push(diagnostics, '/tabs', 'tabs.required', '至少需要一个页签')
+    return { valid: false, diagnostics }
+  }
+  const keys = new Set<string>()
+  schema.tabs.forEach((tab, index) => {
+    const path = `/tabs/${index}`
+    if (!tab.key) push(diagnostics, path, 'tab.key', '页签 key 不能为空')
+    if (keys.has(tab.key)) push(diagnostics, path, 'tab.duplicate', `页签 key 重复：${tab.key}`)
+    keys.add(tab.key)
+    if (!tab.label) push(diagnostics, path, 'tab.label', '页签标题不能为空')
+    if (tab.content.type === 'crud') {
+      const result = validateCrudPageSchema(tab.content.schema, registry)
+      diagnostics.push(...result.diagnostics.map((item) => ({ ...item, path: `${path}/content/schema${item.path}` })))
+    } else if (tab.content.type === 'slot') {
+      if (!tab.content.slot) push(diagnostics, path, 'tab.slot', 'slot 页签必须指定 slot key')
+      if (tab.content.slot && registry && !registry.slots[tab.content.slot])
+        push(diagnostics, path, 'registry.slot', `未注册插槽：${tab.content.slot}`)
+    } else {
+      push(diagnostics, path, 'tab.content', '不支持的页签内容类型')
+    }
+  })
+  return { valid: diagnostics.length === 0, diagnostics }
+}
+
+export function assertValidTabbedPageSchema(schema: TabbedPageSchema, registry?: BestRegistry) {
+  const result = validateTabbedPageSchema(schema, registry)
   if (!result.valid) {
     const message = result.diagnostics.map((item) => `${item.path}: ${item.message}`).join('\n')
     throw new Error(`Schema 校验失败：\n${message}`)
