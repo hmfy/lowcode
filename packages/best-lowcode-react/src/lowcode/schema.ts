@@ -48,6 +48,7 @@ export type TableColumnSchema = {
   title: string
   dict?: string
   width?: number
+  fixed?: 'left' | 'right'
   format?: 'date' | 'datetime' | 'money' | 'text'
   slot?: string
 }

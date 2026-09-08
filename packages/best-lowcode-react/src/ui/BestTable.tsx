@@ -6,7 +6,7 @@ import {
 } from '@ant-design/pro-components'
 import type { TableProps } from 'antd'
 import type { ReactNode } from 'react'
-import styles from './BestTable.module.less'
+import './BestTable.module.less'
 
 export type BestTableColumn<T extends Record<string, unknown>> = NonNullable<
   ProTableProps<T, ParamsType>['columns']
@@ -51,7 +51,7 @@ export function BestTable<
   return (
     <ProTable<DataSource, Params, ValueType>
       {...props}
-      className={[styles.root, className].filter(Boolean).join(' ')}
+      className={['best-lowcode-table', className].filter(Boolean).join(' ')}
       columns={columns as ProTableProps<DataSource, Params, ValueType>['columns']}
       options={false}
       search={mergeSearch(defaultSearch, search as typeof defaultSearch | false | undefined)}

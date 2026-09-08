@@ -49,10 +49,21 @@ vi.mock('../src/ui', () => ({
       提交表单
     </button>
   ),
-  BestSearch: ({ onSearch }: { onSearch: (value: Record<string, unknown>) => void }) => (
-    <button onClick={() => onSearch({ tag: 'retail' })} type='button'>
-      搜索
-    </button>
+  BestSearch: ({
+    onReset,
+    onSearch
+  }: {
+    onReset?: (value: Record<string, unknown>) => void
+    onSearch: (value: Record<string, unknown>) => void
+  }) => (
+    <>
+      <button onClick={() => onSearch({ tag: 'retail' })} type='button'>
+        搜索
+      </button>
+      <button onClick={() => onReset?.({ tag: 'default' })} type='button'>
+        重置搜索
+      </button>
+    </>
   ),
   BestTable: ({
     actionRef,
@@ -292,6 +303,36 @@ describe('BestCrudPage', () => {
     await waitFor(() =>
       expect(list).toHaveBeenLastCalledWith(
         expect.objectContaining({ filters: { tag: 'retail' } }),
+        expect.anything()
+      )
+    )
+  })
+
+  it('uses search defaults again after reset', async () => {
+    const list = vi.fn().mockResolvedValue({ items: [], total: 0 })
+    const pageSchema = {
+      ...schema,
+      searchMode: 'bestSearch' as const,
+      search: [
+        { field: 'tag', label: '标签', component: 'input' as const, defaultValue: 'default' }
+      ]
+    }
+    renderSchemaPage(pageSchema, {
+      listServices: { 'customer.list': list },
+      services: {
+        'customer.create': vi.fn(),
+        'customer.update': vi.fn(),
+        'customer.remove': vi.fn()
+      }
+    })
+
+    await waitFor(() => expect(list).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('button', { name: '搜索' }))
+    fireEvent.click(screen.getByRole('button', { name: '重置搜索' }))
+
+    await waitFor(() =>
+      expect(list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ filters: { tag: 'default' } }),
         expect.anything()
       )
     )

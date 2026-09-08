@@ -230,6 +230,14 @@ export function validateCrudPageSchema(
   if (!schema.table?.columns?.length)
     push(diagnostics, '/table/columns', 'table.columns', '至少需要一列')
   schema.table?.columns?.forEach((column, index) => {
+    if (column.fixed !== undefined && column.fixed !== 'left' && column.fixed !== 'right') {
+      push(
+        diagnostics,
+        `/table/columns/${index}/fixed`,
+        'column.fixed',
+        `不支持的固定位置：${column.fixed}`
+      )
+    }
     if (column.format && !columnFormats.has(column.format)) {
       push(
         diagnostics,

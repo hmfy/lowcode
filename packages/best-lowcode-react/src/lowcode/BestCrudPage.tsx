@@ -181,6 +181,7 @@ function toTableColumn(
     search: false,
     title: column.title,
     width: column.width,
+    fixed: column.fixed,
     valueEnum,
     renderText:
       column.format && !slot && !column.dict
@@ -377,9 +378,12 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
     })
     configuredColumns.push(...searchColumns.values())
     if (!schema.table.actions?.length) return configuredColumns
+    const actionColumnWidth = Math.max(160, schema.table.actions.length * 80 + 32)
     configuredColumns.push({
       title: '操作',
       valueType: 'option',
+      fixed: 'right',
+      width: actionColumnWidth,
       render: (_, record) =>
         schema.table.actions?.map((action) => (
           <ActionButton action={action} key={action.id} record={record} onExecute={handleAction} />
@@ -489,10 +493,10 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
           fields={searchFields}
           value={query}
           defaultValues={searchDefaultValues}
-          onReset={() => {
-            queryRef.current = {}
+          onReset={(values) => {
+            queryRef.current = values
             queryStateRef.current = { ...queryStateRef.current, userTouched: true }
-            setQuery({})
+            setQuery(values)
             actionRef.current?.reload()
           }}
           onSearch={(values) => {

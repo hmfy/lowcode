@@ -110,6 +110,25 @@ describe('lowcode schema', () => {
     )
   })
 
+  it('accepts left and right fixed table columns', () => {
+    const result = validateUnknownCrudPageSchema({
+      $schema: 'https://best.dev/schema/crud/v1',
+      version: 1,
+      id: 'test',
+      kind: 'crud',
+      title: '测试页',
+      dataSource: { list: 'test.list' },
+      table: {
+        rowKey: 'id',
+        columns: [
+          { field: 'id', title: 'ID', fixed: 'left' },
+          { field: 'actions', title: '操作', fixed: 'right' }
+        ]
+      }
+    })
+    expect(result.valid).toBe(true)
+  })
+
   it('requires registered slots for custom form fields and detail fields', () => {
     const schema = {
       ...crudSchema({ list: 'customer.list', remove: 'customer.remove' }),
