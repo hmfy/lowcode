@@ -1,7 +1,7 @@
 import { access, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   DEVTOOLS_PACKAGE,
   installBestLowcode,
@@ -30,6 +30,52 @@ const clientOnly: HostDetector = async () => 'client'
 const codexOnly: HostDetector = async (host) => (host.id === 'codex' ? 'cli' : 'unavailable')
 
 describe('best-lowcode-installer', () => {
+  beforeEach(() => vi.stubEnv('VOLTA_HOME', ''))
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('installs with Volta and uses its resolved MCP executable', async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), 'best-lowcode-installer-'))
+    const { runner, calls } = runnerWith((command, args) => {
+      if (command === 'volta' && args[0] === 'which') return { ok: true, stdout: '/volta/tools/best-lowcode-mcp\n', stderr: '' }
+      return { ok: true, stdout: '', stderr: '' }
+    })
+    const result = await installBestLowcode({
+      homeDir, runner, environment: { VOLTA_HOME: '/volta' }, platform: 'darwin',
+      hostDetector: codexOnly, skillSourceDir: skillSource, devtoolsVersion: '0.2.0'
+    })
+    expect(result.ok).toBe(true)
+    expect(result.mcpCommand).toBe('/volta/tools/best-lowcode-mcp')
+    expect(calls).toContainEqual(['volta', ['install', `${DEVTOOLS_PACKAGE}@0.2.0`]])
+    expect(calls).toContainEqual(['best', ['--help']])
+    expect(calls.some(([command]) => command === 'npm')).toBe(false)
+  })
+
+  it.each([{}, { VOLTA_HOME: '/volta' }])('stops when installed best is not executable (%j)', async (environment) => {
+    const { runner, calls } = runnerWith((command) => ({ ok: command !== 'best', stdout: '', stderr: command === 'best' ? 'ENOENT' : '' }))
+    const result = await installBestLowcode({ runner, environment, platform: 'darwin' })
+    expect(result).toMatchObject({ ok: false, devtools: 'failed', hosts: [] })
+    expect(result.devtoolsMessage).toContain('ENOENT')
+    expect(calls).toHaveLength(2)
+  })
+
+  it('does not fall back to npm when Volta installation fails', async () => {
+    const { runner, calls } = runnerWith(() => ({ ok: false, stdout: '', stderr: 'Volta install failed' }))
+    const result = await installBestLowcode({ runner, environment: { VOLTA_HOME: '/volta' } })
+    expect(result.ok).toBe(false)
+    expect(calls).toEqual([['volta', ['install', `${DEVTOOLS_PACKAGE}@latest`]]])
+  })
+
+  it('stops before configuring hosts if Volta cannot resolve the MCP executable', async () => {
+    const { runner, calls } = runnerWith((command, args) => ({
+      ok: !(command === 'volta' && args[0] === 'which'), stdout: '', stderr: 'missing executable'
+    }))
+    const result = await installBestLowcode({
+      runner, environment: { VOLTA_HOME: '/volta' }, hostDetector: codexOnly, platform: 'darwin'
+    })
+    expect(result).toMatchObject({ ok: false, hosts: [] })
+    expect(result.devtoolsMessage).toContain('Volta MCP 命令路径')
+    expect(calls.some(([command]) => command === 'codex')).toBe(false)
+  })
   it('installs global DevTools, both host Skills, and missing MCP registrations through host CLIs', async () => {
     const homeDir = await mkdtemp(join(tmpdir(), 'best-lowcode-installer-'))
     const { runner, calls } = runnerWith((command, args) => {
@@ -54,6 +100,12 @@ describe('best-lowcode-installer', () => {
     expect(calls).toContainEqual(['agent', ['mcp', 'add', 'best-lowcode', '--', '/opt/npm/bin/best-lowcode-mcp']])
     await expect(readFile(join(homeDir, '.codex', 'skills', 'best-lowcode', 'SKILL.md'), 'utf8')).resolves.toContain(
       'default workflow uses the registered `best-lowcode` MCP server'
+    )
+    await expect(readFile(join(homeDir, '.codex', 'skills', 'best-lowcode', 'SKILL.md'), 'utf8')).resolves.toContain(
+      'Toolchain availability is a stopping condition'
+    )
+    await expect(readFile(join(homeDir, '.codex', 'skills', 'best-lowcode', 'SKILL.md'), 'utf8')).resolves.toContain(
+      'stop the low-code implementation'
     )
     await expect(access(join(homeDir, '.cursor', 'skills', 'best-lowcode', 'SKILL.md'))).resolves.toBeUndefined()
   })

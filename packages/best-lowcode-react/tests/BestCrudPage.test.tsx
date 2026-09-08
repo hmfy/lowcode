@@ -36,7 +36,7 @@ type TableColumn = {
 
 vi.mock('../src/ui', () => ({
   BestDetail: () => <div>详情</div>,
-  BestDrawer: ({ children, open }: { children: ReactNode; open: boolean }) =>
+  BestModal: ({ children, open }: { children: ReactNode; open: boolean }) =>
     open ? <div>{children}</div> : null,
   BestForm: ({
     initialValues,
@@ -186,7 +186,7 @@ describe('BestCrudPage', () => {
     expect(screen.getByRole('button', { name: '新增' }).getAttribute('data-button-type')).toBe('primary')
     expect(screen.getByRole('button', { name: '编辑' }).getAttribute('data-button-type')).toBe('link')
   })
-  it('loads records, submits create and edit drawers, and reloads the table', async () => {
+  it('loads records, submits create and edit modals, and reloads the table', async () => {
     const list = vi.fn().mockResolvedValue({ items: [], total: 0 })
     const create = vi.fn().mockResolvedValue(undefined)
     const update = vi.fn().mockResolvedValue(undefined)

@@ -360,7 +360,10 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
   const version = options.devtoolsVersion ?? 'latest'
   const sourceSkill = options.skillSourceDir ?? bundledSkillDirectory()
   progress(`1/3 正在安装全局 DevTools（${version}）…`)
-  const devtoolsInstall = await runner('npm', ['install', '--global', `${DEVTOOLS_PACKAGE}@${version}`])
+  const useVolta = Boolean(environment.VOLTA_HOME)
+  const devtoolsInstall = useVolta
+    ? await runner('volta', ['install', `${DEVTOOLS_PACKAGE}@${version}`])
+    : await runner('npm', ['install', '--global', `${DEVTOOLS_PACKAGE}@${version}`])
 
   if (!devtoolsInstall.ok) {
     progress('✗ 全局 DevTools 安装失败')
@@ -368,6 +371,18 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
       ok: false,
       devtools: 'failed',
       devtoolsMessage: `全局安装 ${DEVTOOLS_PACKAGE} 失败：${devtoolsInstall.stderr || devtoolsInstall.stdout}`,
+      hosts: []
+    }
+  }
+  const cliCheck = osPlatform === 'win32'
+    ? await runner('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', '& best --help; if (-not $?) { exit 1 }'])
+    : await runner('best', ['--help'])
+  if (!cliCheck.ok) {
+    progress('✗ 全局 best 命令不可用')
+    return {
+      ok: false,
+      devtools: 'failed',
+      devtoolsMessage: `DevTools 已安装，但 best --help 执行失败。请检查 ${useVolta ? 'VOLTA_HOME/bin' : 'npm 全局命令目录'} 是否在终端 PATH 中：${cliCheck.stderr || cliCheck.stdout}`,
       hosts: []
     }
   }
@@ -397,18 +412,20 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
     }
   }
 
-  const prefix = await runner('npm', ['prefix', '--global'])
+  const prefix = useVolta
+    ? await runner('volta', ['which', 'best-lowcode-mcp'])
+    : await runner('npm', ['prefix', '--global'])
   if (!prefix.ok || !prefix.stdout.trim()) {
-    progress('✗ 无法解析全局 npm prefix')
+    progress('✗ 无法解析 MCP 命令路径')
     return {
       ok: false,
       devtools: 'installed',
-      devtoolsMessage: `无法解析全局 npm prefix：${prefix.stderr || prefix.stdout}`,
+      devtoolsMessage: `无法解析 ${useVolta ? 'Volta MCP 命令路径' : '全局 npm prefix'}：${prefix.stderr || prefix.stdout}`,
       hosts: []
     }
   }
 
-  const mcpCommand = globalMcpCommand(prefix.stdout.trim(), osPlatform)
+  const mcpCommand = useVolta ? prefix.stdout.trim() : globalMcpCommand(prefix.stdout.trim(), osPlatform)
   progress('3/3 正在安装 Skill 并配置 MCP…')
   const hosts: HostInstallResult[] = []
   for (const { host, availability } of availableHosts) {

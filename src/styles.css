@@ -42,5 +42,14 @@ body { background: #f5f7fa; font-family: Inter, -apple-system, BlinkMacSystemFon
 .best-schema-runtime { display: none; }
 .provider-api-info-card { display: grid; gap: 8px; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fafafa; }
 .provider-api-info-item { min-height: 32px; display: flex; align-items: center; padding: 0 12px; border: 1px solid #e5e7eb; border-radius: 4px; background: #fff; color: #4b5563; }
+.balance-alert-page .ant-tabs-nav { margin-bottom: 16px; background: #fff; padding: 0 16px; border-radius: 8px; }
+.balance-alert-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.balance-alert-grid .ant-input-number, .balance-alert-form .ant-select { width: 100%; }
+.config-section { margin-top: 8px; }
+.time-list { display: grid; gap: 8px; margin-bottom: 6px; }
+.form-footer { display: flex; justify-content: flex-end; margin-top: 16px; }
+.balance-alert-page .table-toolbar { justify-content: space-between; gap: 16px; }
+.balance-alert-page .table-toolbar > div:first-child { width: min(320px, 100%); }
+@media (max-width: 960px) { .balance-alert-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 1200px) { .filters-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); } }
 @media (max-width: 768px) { .app-content { padding: 16px; } .page-heading { flex-direction: column; } }

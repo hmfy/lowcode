@@ -89,9 +89,18 @@
     "warning.assign": {"description": "为预警分配客户"},
     "provider.list": {"description": "查询服务商静态展示列表"},
     "provider.detail": {"description": "查询服务商静态展示详情"},
-    "provider.update": {"description": "服务商编辑视觉演示，不持久化数据"}
+    "provider.update": {"description": "服务商编辑视觉演示，不持久化数据"},
+    "customerBalanceWarning.global.get": {"description": "获取客户余额预警全局配置（静态数据）"},
+    "customerBalanceWarning.global.update": {"description": "更新客户余额预警全局配置（静态数据）"},
+    "customerBalanceWarning.customer.list": {"description": "查询客户余额预警客户配置分页列表（静态数据）"},
+    "customerBalanceWarning.customer.detail": {"description": "查询客户余额预警客户配置详情（静态数据）"},
+    "customerBalanceWarning.customer.create": {"description": "新增客户余额预警客户配置（静态数据）"},
+    "customerBalanceWarning.customer.update": {"description": "更新客户余额预警客户配置（静态数据）"},
+    "customerBalanceWarning.customer.remove": {"description": "删除客户余额预警客户配置（静态数据）"},
+    "customerBalanceWarning.record.list": {"description": "查询客户余额预警记录分页列表（静态数据）"},
+    "customerBalanceWarning.record.detail": {"description": "查询客户余额预警记录详情（静态数据）"}
   },
-  "dictionaries": ["status", "tags", "sources", "channels", "pricingModes", "boolean", "warningTypes", "providers", "processStatuses", "chargeStatuses", "providerStatus"],
+  "dictionaries": ["status", "tags", "sources", "channels", "pricingModes", "boolean", "warningTypes", "providers", "processStatuses", "chargeStatuses", "providerStatus", "balanceWarningFrequency", "balanceWarningNoticeStatus", "balanceWarningWeekday"],
   "actions": ["customer.toggleStatus", "customer.resetPassword"],
   "slots": ["customer.tieredPricing", "warning.assign", "provider.apiList", "provider.status", "provider.apiInfo"],
   "access": []

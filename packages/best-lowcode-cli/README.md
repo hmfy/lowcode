@@ -174,8 +174,16 @@ validation in this package.
 
 1. The internal `src/mcp/adapters/best-lowcode.ts` adapter connects `best-lowcode-runtime/dev` for safe
    Schema validation and built-in capabilities. Extend that adapter as the primary package grows.
-2. Keep `best-lowcode-runtime: workspace:*` in this CLI package; the MCP modules must not import React
-   runtime modules directly.
+2. Keep `best-lowcode-runtime: workspace:*` only in this CLI package's devDependencies. Build the
+   pure `/dev` validation and capability code into the CLI/MCP bundles; published production
+   dependencies must not include Runtime, React, or Ant Design.
+
+CLI help, MCP startup, and project initialization do not require a project Runtime. Project task
+preparation and verification check that a declared Runtime is actually installed, supports
+`>=0.2.3 <0.3.0`, and has compatible installed peer dependencies. Missing or incompatible packages
+produce diagnostics with the project directory and a package-manager-specific install command;
+DevTools never installs those dependencies globally or automatically. Update the supported range
+alongside the bundled validator when adopting a new Runtime compatibility series.
 3. The published package exposes the `best` command through compiled `dist/bin.js`; use the
    `dev:best` script only when developing this workspace package itself.
 

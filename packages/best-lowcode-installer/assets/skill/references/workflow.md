@@ -8,6 +8,12 @@ When the MCP server cannot be used, CLI fallback is allowed only for its matchin
 `best prepare`, `best validate-selection`, `best preview-change`, and `best verify`. State the MCP
 failure and fallback in the final result.
 
+If the matching CLI command is unavailable or cannot execute, stop immediately. Report the MCP and
+CLI failures to the user and request a repaired BEST toolchain; do not implement the feature with
+handwritten components, Ant Design, or an improvised local replacement. A handwritten path is
+available only when the successful `prepare` result marks the requirement `extension-required` and
+the user explicitly selects it.
+
 `best preview-change` takes a candidate file and returns the same non-writing validation/diff
 result as `best_preview_change`.
 

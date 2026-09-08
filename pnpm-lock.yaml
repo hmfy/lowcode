@@ -63,13 +63,19 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.0.0
         version: 1.30.0(zod@4.5.4)
-      best-lowcode-runtime:
-        specifier: workspace:*
-        version: link:../best-lowcode-react
+      semver:
+        specifier: ^7.7.0
+        version: 7.8.5
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
     devDependencies:
+      '@types/semver':
+        specifier: ^7.7.0
+        version: 7.8.0
+      best-lowcode-runtime:
+        specifier: workspace:*
+        version: link:../best-lowcode-react
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
@@ -1042,6 +1048,9 @@ packages:
   '@types/react@19.2.18':
     resolution: {integrity: sha512-AnzbBERsrLKtk2XSfTbYRLjQPdy116Sty4q+T+Bp3IC4l6jNBvreVPAHmpq9qhXQM7CXZPjLVmGMw9sy+hxQ3w==}
 
+  '@types/semver@7.8.0':
+    resolution: {integrity: sha512-1mAINjtQCXXeLkJ9ehXkwOcBpqtLxiVtKhpUf83DdRNdQKV0iXZpaHYqRr7nj+wvxuJzoAmAwXI+sCNMv1CzLQ==}
+
   '@umijs/route-utils@4.0.3':
     resolution: {integrity: sha512-zPEcYhl1cSfkSRDzzGgoD1mDvGjxoOTJFvkn55srfgdQ3NZe2ZMCScCU6DEnOxuKP1XDVf8pqyqCDVd2+RCQIw==}
 
@@ -1817,6 +1826,11 @@ packages:
 
   semver@6.3.1:
     resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
+    hasBin: true
+
+  semver@7.8.5:
+    resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
+    engines: {node: '>=10'}
     hasBin: true
 
   send@1.2.1:
@@ -3080,6 +3094,8 @@ snapshots:
     dependencies:
       csstype: 3.2.3
 
+  '@types/semver@7.8.0': {}
+
   '@umijs/route-utils@4.0.3': {}
 
   '@umijs/use-params@1.0.9(react@19.2.8)':
@@ -3943,6 +3959,8 @@ snapshots:
       compute-scroll-into-view: 3.1.1
 
   semver@6.3.1: {}
+
+  semver@7.8.5: {}
 
   send@1.2.1:
     dependencies:

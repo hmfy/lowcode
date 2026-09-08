@@ -15,14 +15,12 @@ await Promise.all(
       bundle: true,
       entryPoints: [resolve(packageRoot, entryPoint)],
       external: [
-        'best-lowcode-runtime',
-        'best-lowcode-runtime/dev',
         '@modelcontextprotocol/sdk',
+        'semver',
         'typescript'
       ],
       format: 'esm',
       outfile: resolve(packageRoot, outfile),
-      packages: 'external',
       platform: 'node',
       sourcemap: true,
       target: 'node20'

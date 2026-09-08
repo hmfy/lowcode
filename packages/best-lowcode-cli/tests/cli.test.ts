@@ -59,6 +59,8 @@ describe('best CLI', () => {
 
   it('previews a candidate file without writing the target file', async () => {
     const root = await mkdtemp(join(tmpdir(), 'best-lowcode-cli-'))
+    const { installFixturePackage } = await import('./runtime-fixture')
+    await installFixturePackage(root)
     await writeFile(
       join(root, 'package.json'),
       JSON.stringify({ dependencies: { 'best-lowcode-runtime': 'workspace:*' } })

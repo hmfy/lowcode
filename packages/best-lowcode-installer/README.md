@@ -10,6 +10,12 @@ npx -y best-lowcode-installer
 The installer prints line-based progress for DevTools installation, host detection, and each
 Skill/MCP configuration step, then prints the full JSON result for scripting.
 
+When `VOLTA_HOME` is set, DevTools are installed with `volta install` so Volta creates global
+command shims; the MCP executable is resolved with `volta which`. Otherwise the installer uses
+`npm install --global`. Both paths must pass `best --help` before host configuration proceeds.
+If that check fails, installation reports failure and identifies the command directory to check
+in `PATH`, rather than reporting a successful installation with an unusable CLI.
+
 The installer copies Skills to `~/.codex/skills` and `~/.cursor/skills`. It first prefers the
 native host CLI for MCP registration. If only the desktop client is detected, it uses a
 host-specific fallback:

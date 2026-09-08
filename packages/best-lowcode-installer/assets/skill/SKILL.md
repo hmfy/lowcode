@@ -12,6 +12,19 @@ The default workflow uses the registered `best-lowcode` MCP server. Use the glob
 `best` CLI only when MCP is unavailable or a tool call fails; state that fallback reason in the
 final report.
 
+## Toolchain availability is a stopping condition
+
+When MCP is unavailable or its invocation fails, try the matching `best` CLI command once. If the
+CLI is also unavailable or cannot execute, stop the low-code implementation: do not write business
+code, substitute Ant Design or another handwritten UI, invent a local workflow, or report the
+feature as complete. Tell the user which MCP/CLI capability failed and ask them to restore the
+BEST toolchain before continuing.
+
+Only use a Runtime extension, local Slot, or handwritten implementation after `best_prepare_task`
+or `best prepare` explicitly reports `extension-required` and the user chooses that option. Tool
+unavailability is not evidence that an extension is required and never authorizes a handwritten
+fallback.
+
 1. Call `best_configure_project(projectRoot, allowedPaths, manifestPaths, verificationCommands)`
    without `write` when configuration is missing or the request needs a new permitted path. Inspect
    the project and the user's request to select the candidate paths; present the returned diff and

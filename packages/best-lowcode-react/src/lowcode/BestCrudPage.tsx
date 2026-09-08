@@ -6,9 +6,9 @@ import { useBestListService, useBestRegistry } from '../runtime'
 import {
   BestDetail,
   type BestDetailField,
-  BestDrawer,
   type BestFieldDefinition,
   BestForm,
+  BestModal,
   BestSearch,
   BestTable,
   type BestTableColumn
@@ -528,7 +528,7 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
           )) ?? []
         }
       />
-      <BestDrawer
+      <BestModal
         open={drawer.mode !== 'closed'}
         title={
           drawer.mode === 'detail'
@@ -561,7 +561,7 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
             }}
           />
         ) : null}
-      </BestDrawer>
+      </BestModal>
     </>
   )
 
