@@ -145,9 +145,13 @@ function hasRegisteredServer(result: CommandResult) {
   return new RegExp(`(^|\\s)${MCP_SERVER_NAME}(?=\\s|$|:)`, 'm').test(normalizeOutput(result))
 }
 
-function globalMcpCommand(prefix: string, osPlatform: NodeJS.Platform) {
-  if (osPlatform === 'win32') return win32Path.join(prefix, 'best-lowcode-mcp.cmd')
-  return join(prefix, 'bin', 'best-lowcode-mcp')
+function npmExecutableCommand(prefix: string, executable: string, osPlatform: NodeJS.Platform) {
+  if (osPlatform === 'win32') return win32Path.join(prefix, `${executable}.cmd`)
+  return join(prefix, 'bin', executable)
+}
+
+function npmMcpCommand(prefix: string, osPlatform: NodeJS.Platform) {
+  return npmExecutableCommand(prefix, 'best-lowcode-mcp', osPlatform)
 }
 
 async function installSkill(source: string, destination: string) {
@@ -359,34 +363,39 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
   const progress = options.onProgress ?? (() => undefined)
   const version = options.devtoolsVersion ?? 'latest'
   const sourceSkill = options.skillSourceDir ?? bundledSkillDirectory()
-  progress(`1/3 正在安装全局 DevTools（${version}）…`)
-  const useVolta = Boolean(environment.VOLTA_HOME)
-  const devtoolsInstall = useVolta
-    ? await runner('volta', ['install', `${DEVTOOLS_PACKAGE}@${version}`])
-    : await runner('npm', ['install', '--global', `${DEVTOOLS_PACKAGE}@${version}`])
+  const npmPrefix = join(homeDir, '.best-lowcode')
+  progress(`1/3 正在安装 DevTools（${version}）…`)
+  const devtoolsInstall = await runner('npm', ['install', '--global', '--prefix', npmPrefix, `${DEVTOOLS_PACKAGE}@${version}`])
 
   if (!devtoolsInstall.ok) {
-    progress('✗ 全局 DevTools 安装失败')
+    progress('✗ DevTools 安装失败')
     return {
       ok: false,
       devtools: 'failed',
-      devtoolsMessage: `全局安装 ${DEVTOOLS_PACKAGE} 失败：${devtoolsInstall.stderr || devtoolsInstall.stdout}`,
+      devtoolsMessage: `安装 ${DEVTOOLS_PACKAGE} 失败：${devtoolsInstall.stderr || devtoolsInstall.stdout}`,
       hosts: []
     }
   }
+  const cliCommand = npmExecutableCommand(npmPrefix, 'best', osPlatform)
   const cliCheck = osPlatform === 'win32'
-    ? await runner('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', '& best --help; if (-not $?) { exit 1 }'])
-    : await runner('best', ['--help'])
+    ? await runner('powershell.exe', [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        '& $args[0] --help; if (-not $?) { exit 1 }',
+        cliCommand
+      ])
+    : await runner(cliCommand, ['--help'])
   if (!cliCheck.ok) {
-    progress('✗ 全局 best 命令不可用')
+    progress('✗ best 命令不可用')
     return {
       ok: false,
       devtools: 'failed',
-      devtoolsMessage: `DevTools 已安装，但 best --help 执行失败。请检查 ${useVolta ? 'VOLTA_HOME/bin' : 'npm 全局命令目录'} 是否在终端 PATH 中：${cliCheck.stderr || cliCheck.stdout}`,
+      devtoolsMessage: `DevTools 已安装，但 ${cliCommand} --help 执行失败：${cliCheck.stderr || cliCheck.stdout}`,
       hosts: []
     }
   }
-  progress('✓ 全局 DevTools 已安装')
+  progress(`✓ DevTools 已安装：${npmPrefix}`)
 
   progress('2/3 正在探测 Codex 与 Cursor…')
   const hostDetector = options.hostDetector ?? defaultHostDetector
@@ -412,20 +421,18 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
     }
   }
 
-  const prefix = useVolta
-    ? await runner('volta', ['which', 'best-lowcode-mcp'])
-    : await runner('npm', ['prefix', '--global'])
+  const prefix = { ok: true, stdout: npmPrefix, stderr: '' }
   if (!prefix.ok || !prefix.stdout.trim()) {
     progress('✗ 无法解析 MCP 命令路径')
     return {
       ok: false,
       devtools: 'installed',
-      devtoolsMessage: `无法解析 ${useVolta ? 'Volta MCP 命令路径' : '全局 npm prefix'}：${prefix.stderr || prefix.stdout}`,
+      devtoolsMessage: `无法解析 DevTools 安装目录：${prefix.stderr || prefix.stdout}`,
       hosts: []
     }
   }
 
-  const mcpCommand = useVolta ? prefix.stdout.trim() : globalMcpCommand(prefix.stdout.trim(), osPlatform)
+  const mcpCommand = npmMcpCommand(prefix.stdout.trim(), osPlatform)
   progress('3/3 正在安装 Skill 并配置 MCP…')
   const hosts: HostInstallResult[] = []
   for (const { host, availability } of availableHosts) {

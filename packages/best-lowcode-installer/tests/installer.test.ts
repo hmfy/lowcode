@@ -1,6 +1,6 @@
 import { access, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, win32 as win32Path } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   DEVTOOLS_PACKAGE,
@@ -12,6 +12,7 @@ import {
 } from '../src'
 
 const skillSource = join(process.cwd(), 'assets', 'skill')
+const userDevtoolsPrefix = (homeDir: string) => join(homeDir, '.best-lowcode')
 
 function runnerWith(
   handler: (command: string, args: string[]) => CommandResult
@@ -33,53 +34,47 @@ describe('best-lowcode-installer', () => {
   beforeEach(() => vi.stubEnv('VOLTA_HOME', ''))
   afterEach(() => vi.unstubAllEnvs())
 
-  it('installs with Volta and uses its resolved MCP executable', async () => {
+  it('uses the user directory even when VOLTA_HOME is set', async () => {
     const homeDir = await mkdtemp(join(tmpdir(), 'best-lowcode-installer-'))
-    const { runner, calls } = runnerWith((command, args) => {
-      if (command === 'volta' && args[0] === 'which') return { ok: true, stdout: '/volta/tools/best-lowcode-mcp\n', stderr: '' }
-      return { ok: true, stdout: '', stderr: '' }
-    })
+    const { runner, calls } = runnerWith(() => ({ ok: true, stdout: '', stderr: '' }))
     const result = await installBestLowcode({
       homeDir, runner, environment: { VOLTA_HOME: '/volta' }, platform: 'darwin',
       hostDetector: codexOnly, skillSourceDir: skillSource, devtoolsVersion: '0.2.0'
     })
     expect(result.ok).toBe(true)
-    expect(result.mcpCommand).toBe('/volta/tools/best-lowcode-mcp')
-    expect(calls).toContainEqual(['volta', ['install', `${DEVTOOLS_PACKAGE}@0.2.0`]])
-    expect(calls).toContainEqual(['best', ['--help']])
-    expect(calls.some(([command]) => command === 'npm')).toBe(false)
+    expect(result.mcpCommand).toBe(join(userDevtoolsPrefix(homeDir), 'bin', 'best-lowcode-mcp'))
+    expect(calls).toContainEqual([
+      'npm',
+      ['install', '--global', '--prefix', userDevtoolsPrefix(homeDir), `${DEVTOOLS_PACKAGE}@0.2.0`]
+    ])
+    expect(calls).toContainEqual([join(userDevtoolsPrefix(homeDir), 'bin', 'best'), ['--help']])
+    expect(calls.some(([command]) => command === 'volta')).toBe(false)
   })
 
   it.each([{}, { VOLTA_HOME: '/volta' }])('stops when installed best is not executable (%j)', async (environment) => {
-    const { runner, calls } = runnerWith((command) => ({ ok: command !== 'best', stdout: '', stderr: command === 'best' ? 'ENOENT' : '' }))
+    const { runner, calls } = runnerWith((command, args) => ({
+      ok: args[0] !== '--help',
+      stdout: '',
+      stderr: args[0] === '--help' ? `ENOENT: ${command}` : ''
+    }))
     const result = await installBestLowcode({ runner, environment, platform: 'darwin' })
     expect(result).toMatchObject({ ok: false, devtools: 'failed', hosts: [] })
     expect(result.devtoolsMessage).toContain('ENOENT')
     expect(calls).toHaveLength(2)
   })
 
-  it('does not fall back to npm when Volta installation fails', async () => {
-    const { runner, calls } = runnerWith(() => ({ ok: false, stdout: '', stderr: 'Volta install failed' }))
-    const result = await installBestLowcode({ runner, environment: { VOLTA_HOME: '/volta' } })
+  it('reports npm installation failures even when VOLTA_HOME is set', async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), 'best-lowcode-installer-'))
+    const { runner, calls } = runnerWith(() => ({ ok: false, stdout: '', stderr: 'npm install failed' }))
+    const result = await installBestLowcode({ homeDir, runner, environment: { VOLTA_HOME: '/volta' } })
     expect(result.ok).toBe(false)
-    expect(calls).toEqual([['volta', ['install', `${DEVTOOLS_PACKAGE}@latest`]]])
+    expect(calls).toEqual([
+      ['npm', ['install', '--global', '--prefix', userDevtoolsPrefix(homeDir), `${DEVTOOLS_PACKAGE}@latest`]]
+    ])
   })
-
-  it('stops before configuring hosts if Volta cannot resolve the MCP executable', async () => {
-    const { runner, calls } = runnerWith((command, args) => ({
-      ok: !(command === 'volta' && args[0] === 'which'), stdout: '', stderr: 'missing executable'
-    }))
-    const result = await installBestLowcode({
-      runner, environment: { VOLTA_HOME: '/volta' }, hostDetector: codexOnly, platform: 'darwin'
-    })
-    expect(result).toMatchObject({ ok: false, hosts: [] })
-    expect(result.devtoolsMessage).toContain('Volta MCP 命令路径')
-    expect(calls.some(([command]) => command === 'codex')).toBe(false)
-  })
-  it('installs global DevTools, both host Skills, and missing MCP registrations through host CLIs', async () => {
+  it('installs DevTools in the user directory, both host Skills, and missing MCP registrations through host CLIs', async () => {
     const homeDir = await mkdtemp(join(tmpdir(), 'best-lowcode-installer-'))
     const { runner, calls } = runnerWith((command, args) => {
-      if (command === 'npm' && args[0] === 'prefix') return { ok: true, stdout: '/opt/npm\n', stderr: '' }
       if (args.includes('list')) return { ok: true, stdout: 'no MCP servers\n', stderr: '' }
       return { ok: true, stdout: '', stderr: '' }
     })
@@ -89,15 +84,24 @@ describe('best-lowcode-installer', () => {
     expect(result).toMatchObject({
       ok: true,
       devtools: 'installed',
-      mcpCommand: '/opt/npm/bin/best-lowcode-mcp',
+      mcpCommand: join(userDevtoolsPrefix(homeDir), 'bin', 'best-lowcode-mcp'),
       hosts: [
         { host: 'codex', skill: 'installed', mcp: 'installed' },
         { host: 'cursor', skill: 'installed', mcp: 'installed' }
       ]
     })
-    expect(calls).toContainEqual(['npm', ['install', '--global', `${DEVTOOLS_PACKAGE}@latest`]])
-    expect(calls).toContainEqual(['codex', ['mcp', 'add', 'best-lowcode', '--', '/opt/npm/bin/best-lowcode-mcp']])
-    expect(calls).toContainEqual(['agent', ['mcp', 'add', 'best-lowcode', '--', '/opt/npm/bin/best-lowcode-mcp']])
+    expect(calls).toContainEqual([
+      'npm',
+      ['install', '--global', '--prefix', userDevtoolsPrefix(homeDir), `${DEVTOOLS_PACKAGE}@latest`]
+    ])
+    expect(calls).toContainEqual([join(userDevtoolsPrefix(homeDir), 'bin', 'best'), ['--help']])
+    expect(calls.some(([command, args]) => command === 'npm' && args[0] === 'prefix')).toBe(false)
+    expect(calls).toContainEqual([
+      'codex', ['mcp', 'add', 'best-lowcode', '--', join(userDevtoolsPrefix(homeDir), 'bin', 'best-lowcode-mcp')]
+    ])
+    expect(calls).toContainEqual([
+      'agent', ['mcp', 'add', 'best-lowcode', '--', join(userDevtoolsPrefix(homeDir), 'bin', 'best-lowcode-mcp')]
+    ])
     await expect(readFile(join(homeDir, '.codex', 'skills', 'best-lowcode', 'SKILL.md'), 'utf8')).resolves.toContain(
       'default workflow uses the registered `best-lowcode` MCP server'
     )
@@ -107,6 +111,15 @@ describe('best-lowcode-installer', () => {
     await expect(readFile(join(homeDir, '.codex', 'skills', 'best-lowcode', 'SKILL.md'), 'utf8')).resolves.toContain(
       'stop the low-code implementation'
     )
+    await expect(readFile(join(homeDir, '.codex', 'skills', 'best-lowcode', 'SKILL.md'), 'utf8')).resolves.toContain(
+      '~/.best-lowcode/bin/best'
+    )
+    await expect(readFile(join(homeDir, '.codex', 'skills', 'best-lowcode', 'SKILL.md'), 'utf8')).resolves.toContain(
+      '& "$env:USERPROFILE\\.best-lowcode\\best.cmd"'
+    )
+    await expect(readFile(join(homeDir, '.codex', 'skills', 'best-lowcode', 'references', 'workflow.md'), 'utf8')).resolves.toContain(
+      '<best-cli> prepare'
+    )
     await expect(access(join(homeDir, '.cursor', 'skills', 'best-lowcode', 'SKILL.md'))).resolves.toBeUndefined()
   })
 
@@ -115,7 +128,6 @@ describe('best-lowcode-installer', () => {
     await mkdir(join(homeDir, '.codex'), { recursive: true })
     await writeFile(join(homeDir, '.codex', 'config.toml'), 'model = "gpt-5"\n', 'utf8')
     const { runner, calls } = runnerWith((command, args) => {
-      if (command === 'npm' && args[0] === 'prefix') return { ok: true, stdout: '/opt/npm\n', stderr: '' }
       return { ok: true, stdout: '', stderr: '' }
     })
 
@@ -135,7 +147,7 @@ describe('best-lowcode-installer', () => {
       ]
     })
     await expect(readFile(join(homeDir, '.codex', 'config.toml'), 'utf8')).resolves.toBe(
-      'model = "gpt-5"\n\n[mcp_servers.best-lowcode]\ncommand = "/opt/npm/bin/best-lowcode-mcp"\nargs = []\n'
+      `model = "gpt-5"\n\n[mcp_servers.best-lowcode]\ncommand = "${join(userDevtoolsPrefix(homeDir), 'bin', 'best-lowcode-mcp')}"\nargs = []\n`
     )
     await expect(readFile(join(homeDir, '.codex', 'config.toml.best-lowcode.bak'), 'utf8')).resolves.toBe(
       'model = "gpt-5"\n'
@@ -148,7 +160,6 @@ describe('best-lowcode-installer', () => {
   it('opens Cursor deeplinks through PowerShell on Windows and uses a cmd shim for the MCP command', async () => {
     const homeDir = await mkdtemp(join(tmpdir(), 'best-lowcode-installer-'))
     const { runner, calls } = runnerWith((command, args) => {
-      if (command === 'npm' && args[0] === 'prefix') return { ok: true, stdout: 'C:\\Users\\me\\AppData\\Roaming\\npm\n', stderr: '' }
       return { ok: true, stdout: '', stderr: '' }
     })
 
@@ -160,7 +171,7 @@ describe('best-lowcode-installer', () => {
       skillSourceDir: skillSource
     })
 
-    expect(result.mcpCommand).toBe('C:\\Users\\me\\AppData\\Roaming\\npm\\best-lowcode-mcp.cmd')
+    expect(result.mcpCommand).toBe(win32Path.join(userDevtoolsPrefix(homeDir), 'best-lowcode-mcp.cmd'))
     expect(calls).toContainEqual([
       'powershell.exe',
       [
@@ -172,7 +183,7 @@ describe('best-lowcode-installer', () => {
       ]
     ])
     await expect(readFile(join(homeDir, '.codex', 'config.toml'), 'utf8')).resolves.toContain(
-      'command = "C:\\\\Users\\\\me\\\\AppData\\\\Roaming\\\\npm\\\\best-lowcode-mcp.cmd"'
+      `command = "${win32Path.join(userDevtoolsPrefix(homeDir), 'best-lowcode-mcp.cmd').replace(/\\/g, '\\\\')}"`
     )
   })
 
@@ -185,7 +196,6 @@ describe('best-lowcode-installer', () => {
       'utf8'
     )
     const { runner, calls } = runnerWith((command, args) => {
-      if (command === 'npm' && args[0] === 'prefix') return { ok: true, stdout: '/usr/local\n', stderr: '' }
       return { ok: true, stdout: '', stderr: '' }
     })
 
@@ -210,7 +220,7 @@ describe('best-lowcode-installer', () => {
         {
           mcpServers: {
             existing: { command: 'existing-mcp' },
-            'best-lowcode': { command: '/usr/local/bin/best-lowcode-mcp', args: [] }
+            'best-lowcode': { command: join(userDevtoolsPrefix(homeDir), 'bin', 'best-lowcode-mcp'), args: [] }
           }
         },
         null,
@@ -229,7 +239,6 @@ describe('best-lowcode-installer', () => {
       'utf8'
     )
     const { runner } = runnerWith((command, args) => {
-      if (command === 'npm' && args[0] === 'prefix') return { ok: true, stdout: '/opt/npm\n', stderr: '' }
       return { ok: true, stdout: '', stderr: '' }
     })
 
@@ -243,14 +252,13 @@ describe('best-lowcode-installer', () => {
 
     expect(result.hosts[0]).toMatchObject({ host: 'codex', mcp: 'repaired' })
     await expect(readFile(join(homeDir, '.codex', 'config.toml'), 'utf8')).resolves.toBe(
-      '[mcp_servers.other]\ncommand = "other"\n\n[mcp_servers.best-lowcode]\ncommand = "/opt/npm/bin/best-lowcode-mcp"\nargs = []\n'
+      `[mcp_servers.other]\ncommand = "other"\n\n[mcp_servers.best-lowcode]\ncommand = "${join(userDevtoolsPrefix(homeDir), 'bin', 'best-lowcode-mcp')}"\nargs = []\n`
     )
   })
 
   it('reports installation progress in clear stages', async () => {
     const homeDir = await mkdtemp(join(tmpdir(), 'best-lowcode-installer-'))
     const { runner } = runnerWith((command, args) => {
-      if (command === 'npm' && args[0] === 'prefix') return { ok: true, stdout: '/opt/npm\n', stderr: '' }
       if (args.includes('list')) return { ok: true, stdout: 'no MCP servers\n', stderr: '' }
       return { ok: true, stdout: '', stderr: '' }
     })
@@ -264,8 +272,8 @@ describe('best-lowcode-installer', () => {
     })
 
     expect(progress).toEqual(expect.arrayContaining([
-      '1/3 正在安装全局 DevTools（latest）…',
-      '✓ 全局 DevTools 已安装',
+      '1/3 正在安装 DevTools（latest）…',
+      `✓ DevTools 已安装：${userDevtoolsPrefix(homeDir)}`,
       '2/3 正在探测 Codex 与 Cursor…',
       '3/3 正在安装 Skill 并配置 MCP…',
       '✓ Codex：Skill 已安装，MCP 已注册',
@@ -318,7 +326,6 @@ describe('best-lowcode-installer', () => {
   it('re-registers only existing BEST MCP entries when repairMcp is enabled', async () => {
     const homeDir = await mkdtemp(join(tmpdir(), 'best-lowcode-installer-'))
     const { runner, calls } = runnerWith((command, args) => {
-      if (command === 'npm' && args[0] === 'prefix') return { ok: true, stdout: '/usr/local\n', stderr: '' }
       if (command === 'codex' && args.includes('list')) return { ok: true, stdout: 'best-lowcode\n', stderr: '' }
       if (args.includes('list')) return { ok: true, stdout: 'other-server\n', stderr: '' }
       return { ok: true, stdout: '', stderr: '' }
@@ -336,7 +343,9 @@ describe('best-lowcode-installer', () => {
       { host: 'cursor', skill: 'installed', mcp: 'installed' }
     ])
     expect(calls).toContainEqual(['codex', ['mcp', 'remove', 'best-lowcode']])
-    expect(calls).toContainEqual(['codex', ['mcp', 'add', 'best-lowcode', '--', '/usr/local/bin/best-lowcode-mcp']])
+    expect(calls).toContainEqual([
+      'codex', ['mcp', 'add', 'best-lowcode', '--', join(userDevtoolsPrefix(homeDir), 'bin', 'best-lowcode-mcp')]
+    ])
   })
 
   it('skips unavailable hosts without writing their Skills', async () => {
@@ -358,13 +367,15 @@ describe('best-lowcode-installer', () => {
     await expect(access(join(homeDir, '.cursor', 'skills', 'best-lowcode', 'SKILL.md'))).rejects.toThrow()
   })
 
-  it('stops before touching host configuration when global DevTools installation fails', async () => {
+  it('stops before touching host configuration when DevTools installation fails', async () => {
     const homeDir = await mkdtemp(join(tmpdir(), 'best-lowcode-installer-'))
     const { runner, calls } = runnerWith(() => ({ ok: false, stdout: '', stderr: 'network unavailable' }))
 
     const result = await installBestLowcode({ homeDir, hostDetector: codexOnly, runner, skillSourceDir: skillSource })
 
     expect(result).toMatchObject({ ok: false, devtools: 'failed', hosts: [] })
-    expect(calls).toEqual([['npm', ['install', '--global', `${DEVTOOLS_PACKAGE}@latest`]]])
+    expect(calls).toEqual([
+      ['npm', ['install', '--global', '--prefix', userDevtoolsPrefix(homeDir), `${DEVTOOLS_PACKAGE}@latest`]]
+    ])
   })
 })
