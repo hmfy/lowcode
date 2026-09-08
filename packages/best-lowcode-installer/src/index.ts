@@ -1,11 +1,8 @@
 import { access, cp, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { homedir, platform as currentPlatform } from 'node:os'
 import { dirname, join, resolve, win32 as win32Path } from 'node:path'
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
+import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-
-const execFileAsync = promisify(execFile)
 
 export const DEVTOOLS_PACKAGE = 'best-lowcode-devtools'
 export const MCP_SERVER_NAME = 'best-lowcode'
@@ -13,7 +10,8 @@ export const SUPPORTED_HOSTS = ['codex', 'cursor'] as const
 
 export type SupportedHost = (typeof SUPPORTED_HOSTS)[number]
 export type CommandResult = { ok: boolean; stdout: string; stderr: string }
-export type CommandRunner = (command: string, args: string[]) => Promise<CommandResult>
+export type CommandOutput = (chunk: string) => void
+export type CommandRunner = (command: string, args: string[], onOutput?: CommandOutput) => Promise<CommandResult>
 export type InstallStatus =
   | 'installed'
   | 'repaired'
@@ -119,17 +117,50 @@ const HOSTS: HostDefinition[] = [
   }
 ]
 
-async function defaultRunner(command: string, args: string[]): Promise<CommandResult> {
-  try {
-    const { stdout, stderr } = await execFileAsync(command, args, { encoding: 'utf8' })
-    return { ok: true, stdout, stderr }
-  } catch (error) {
-    const result = error as NodeJS.ErrnoException & { stdout?: string; stderr?: string }
-    return {
-      ok: false,
-      stdout: result.stdout ?? '',
-      stderr: result.stderr ?? result.message
+async function defaultRunner(command: string, args: string[], onOutput?: CommandOutput): Promise<CommandResult> {
+  return new Promise((resolveResult) => {
+    let stdout = ''
+    let stderr = ''
+    let settled = false
+    const settle = (result: CommandResult) => {
+      if (settled) return
+      settled = true
+      resolveResult(result)
     }
+    let child
+    try {
+      child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      settle({ ok: false, stdout, stderr: message })
+      return
+    }
+    child.stdout.on('data', (chunk: Buffer) => {
+      const text = chunk.toString()
+      stdout += text
+      onOutput?.(text)
+    })
+    child.stderr.on('data', (chunk: Buffer) => {
+      const text = chunk.toString()
+      stderr += text
+      onOutput?.(text)
+    })
+    child.once('error', (error) => settle({ ok: false, stdout, stderr: stderr || error.message }))
+    child.once('close', (code) => settle({ ok: code === 0, stdout, stderr }))
+  })
+}
+
+function progressRunner(runner: CommandRunner, progress: (message: string) => void): CommandRunner {
+  return async (command, args, onOutput) => {
+    if (onOutput) return runner(command, args, onOutput)
+    let remainder = ''
+    const result = await runner(command, args, (chunk) => {
+      const lines = `${remainder}${chunk}`.split(/\r?\n/)
+      remainder = lines.pop() ?? ''
+      for (const line of lines) if (line.trim()) progress(`  ${line}`)
+    })
+    if (remainder.trim()) progress(`  ${remainder}`)
+    return result
   }
 }
 
@@ -352,18 +383,19 @@ function hostProgressMessage(host: HostDefinition, result: HostInstallResult) {
 }
 
 export async function installBestLowcode(options: InstallerOptions = {}): Promise<InstallerResult> {
-  const runner = options.runner ?? defaultRunner
+  const rawRunner = options.runner ?? defaultRunner
   const homeDir = options.homeDir ?? homedir()
   const osPlatform = options.platform ?? currentPlatform()
   const environment = options.environment ?? process.env
   const progress = options.onProgress ?? (() => undefined)
+  const runner = progressRunner(rawRunner, progress)
   const version = options.devtoolsVersion ?? 'latest'
   const sourceSkill = options.skillSourceDir ?? bundledSkillDirectory()
   progress(`1/3 正在安装全局 DevTools（${version}）…`)
   const useVolta = Boolean(environment.VOLTA_HOME)
   const devtoolsInstall = useVolta
     ? await runner('volta', ['install', `${DEVTOOLS_PACKAGE}@${version}`])
-    : await runner('npm', ['install', '--global', `${DEVTOOLS_PACKAGE}@${version}`])
+    : await runner('npm', ['install', '--global', '--loglevel=info', `${DEVTOOLS_PACKAGE}@${version}`])
 
   if (!devtoolsInstall.ok) {
     progress('✗ 全局 DevTools 安装失败')

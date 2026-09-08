@@ -33,6 +33,19 @@ describe('best-lowcode-installer', () => {
   beforeEach(() => vi.stubEnv('VOLTA_HOME', ''))
   afterEach(() => vi.unstubAllEnvs())
 
+  it('forwards installation command output to progress updates', async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), 'best-lowcode-installer-'))
+    const progress: string[] = []
+    const runner: CommandRunner = async (command, args, onOutput) => {
+      if (command === 'npm' && args[0] === 'install') onOutput?.('npm http fetch GET 200 best-lowcode-devtools\n')
+      if (command === 'npm' && args[0] === 'prefix') return { ok: true, stdout: '/opt/npm\n', stderr: '' }
+      if (args.includes('list')) return { ok: true, stdout: 'no MCP servers\n', stderr: '' }
+      return { ok: true, stdout: '', stderr: '' }
+    }
+    await installBestLowcode({ homeDir, onProgress: (message) => progress.push(message), runner, skillSourceDir: skillSource })
+    expect(progress).toContain('  npm http fetch GET 200 best-lowcode-devtools')
+  })
+
   it('installs with Volta and uses its resolved MCP executable', async () => {
     const homeDir = await mkdtemp(join(tmpdir(), 'best-lowcode-installer-'))
     const { runner, calls } = runnerWith((command, args) => {
@@ -95,7 +108,7 @@ describe('best-lowcode-installer', () => {
         { host: 'cursor', skill: 'installed', mcp: 'installed' }
       ]
     })
-    expect(calls).toContainEqual(['npm', ['install', '--global', `${DEVTOOLS_PACKAGE}@latest`]])
+    expect(calls).toContainEqual(['npm', ['install', '--global', '--loglevel=info', `${DEVTOOLS_PACKAGE}@latest`]])
     expect(calls).toContainEqual(['codex', ['mcp', 'add', 'best-lowcode', '--', '/opt/npm/bin/best-lowcode-mcp']])
     expect(calls).toContainEqual(['agent', ['mcp', 'add', 'best-lowcode', '--', '/opt/npm/bin/best-lowcode-mcp']])
     await expect(readFile(join(homeDir, '.codex', 'skills', 'best-lowcode', 'SKILL.md'), 'utf8')).resolves.toContain(
@@ -365,6 +378,6 @@ describe('best-lowcode-installer', () => {
     const result = await installBestLowcode({ homeDir, hostDetector: codexOnly, runner, skillSourceDir: skillSource })
 
     expect(result).toMatchObject({ ok: false, devtools: 'failed', hosts: [] })
-    expect(calls).toEqual([['npm', ['install', '--global', `${DEVTOOLS_PACKAGE}@latest`]]])
+    expect(calls).toEqual([['npm', ['install', '--global', '--loglevel=info', `${DEVTOOLS_PACKAGE}@latest`]]])
   })
 })

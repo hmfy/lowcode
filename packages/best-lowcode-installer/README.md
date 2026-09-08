@@ -9,6 +9,9 @@ npx -y best-lowcode-installer
 
 The installer prints line-based progress for DevTools installation, host detection, and each
 Skill/MCP configuration step, then prints the full JSON result for scripting.
+While a command is running, it also streams its npm, Volta, Codex, or Cursor output beneath the
+current step. npm installation uses `--loglevel=info`, so network fetch activity remains visible
+instead of appearing stalled.
 
 When `VOLTA_HOME` is set, DevTools are installed with `volta install` so Volta creates global
 command shims; the MCP executable is resolved with `volta which`. Otherwise the installer uses
