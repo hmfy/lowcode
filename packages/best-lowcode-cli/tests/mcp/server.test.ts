@@ -48,18 +48,11 @@ describe('best lowcode MCP server', () => {
     expect(tools.tools.map((tool) => tool.name)).toEqual([
       'best_configure_project',
       'best_get_context',
-      'best_prepare_task',
       'best_validate_selection',
       'best_preview_change',
       'best_discover_manifest',
       'best_verify'
     ])
-    expect(
-      tools.tools.find((tool) => tool.name === 'best_prepare_task')?.inputSchema
-    ).toMatchObject({
-      additionalProperties: false,
-      required: ['request']
-    })
     expect(
       tools.tools.find((tool) => tool.name === 'best_preview_change')?.inputSchema
     ).toMatchObject({
@@ -76,11 +69,6 @@ describe('best lowcode MCP server', () => {
   it('returns controlled errors for invalid tool arguments and unknown tools', async () => {
     const connection = await connectServer()
     connections.push(connection)
-
-    const missingRequest = readText(
-      await connection.client.callTool({ name: 'best_prepare_task', arguments: {} })
-    )
-    expect(missingRequest).toEqual({ error: 'request 必须是字符串' })
 
     const invalidSelection = readText(
       await connection.client.callTool({

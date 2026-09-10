@@ -27,10 +27,12 @@ async function createProject() {
 }
 
 describe('selection validation', () => {
-  it('prepares a deterministic task without starting a host-specific semantic resolver', async () => {
+  it('validates a deterministic task without starting a host-specific semantic resolver', async () => {
     const service = createBestLowcodeMcpService(await createProject())
 
-    const result = await service.prepareTask('调整 rps.client-ledger.list 的查询条件')
+    const result = await service.validateSelection('调整 rps.client-ledger.list 的查询条件', {
+      relatedCapabilities: ['rps.client-ledger.list'], allowedPaths: ['apps/rps/src/pages/client-ledger']
+    })
 
     expect(result.task?.relatedCapabilities).toEqual(['rps.client-ledger.list'])
     expect(result.diagnostics).toEqual([])
@@ -39,10 +41,10 @@ describe('selection validation', () => {
   it('leaves ambiguous requests for the current Agent to select before validation', async () => {
     const service = createBestLowcodeMcpService(await createProject())
 
-    const result = await service.prepareTask('调整客户管理功能')
+    const result = await service.validateSelection('调整客户管理功能', { relatedCapabilities: [], allowedPaths: ['apps/rps/src/pages/client-ledger'] })
 
     expect(result.task?.relatedCapabilities).toEqual([])
-    expect(result.task?.questions).toEqual([])
+    expect(result.task?.questions).toContain('未能从需求中确定可用能力，请确认目标页面、服务、字典或动作。')
   })
 
   it('accepts an Agent selection and excludes Manifest paths from business write paths', async () => {

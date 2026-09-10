@@ -9,7 +9,7 @@ import { syncManifestDiscovery } from './manifest-sync'
 import { previewCandidateChange } from './preview'
 import { checkProjectRuntime } from './runtime'
 import { scanTypeScriptSchemas } from './schema-scan'
-import { describeCapabilities, prepareTask } from './task'
+import { buildAgentTask, describeCapabilities } from './task'
 import type {
   CandidateLanguage,
   Diagnostic,
@@ -100,17 +100,6 @@ export function createBestLowcodeMcpService(
         diagnostics: context.diagnostics
       }
     },
-    async prepareTask(request: string) {
-      const context = await readContext()
-      if (!context.config || hasErrors(context.diagnostics)) {
-        return { task: undefined, diagnostics: context.diagnostics }
-      }
-      const builtInCapabilities = adapter?.builtInCapabilities?.() ?? []
-      return {
-        task: prepareTask(request, context.config, context.contexts, builtInCapabilities),
-        diagnostics: context.diagnostics
-      }
-    },
     async validateSelection(request: string, selection: TaskSelection) {
       const context = await readContext()
       if (!context.config) return { task: undefined, diagnostics: context.diagnostics }
@@ -127,7 +116,7 @@ export function createBestLowcodeMcpService(
       ]
       if (hasErrors(diagnostics)) return { task: undefined, diagnostics }
       return {
-        task: prepareTask(request, context.config, context.contexts, builtInCapabilities, {
+        task: buildAgentTask(request, context.config, context.contexts, builtInCapabilities, {
           relatedCapabilities: [...new Set(selection.relatedCapabilities)],
           // Manifest is a separately controlled capability file, not a business write path.
           allowedPaths: [...new Set(selection.allowedPaths)].filter(

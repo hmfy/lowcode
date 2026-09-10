@@ -52,8 +52,7 @@ describe('project runtime diagnostics', () => {
     )
     await writeFile(join(root, 'lowcode.manifest.json'), '{"version":1}\n')
 
-    await expect(createBestLowcodeMcpService(root).prepareTask('新增客户管理页面')).resolves.toMatchObject({
-      task: undefined,
+    await expect(createBestLowcodeMcpService(root).getContext()).resolves.toMatchObject({
       diagnostics: [expect.objectContaining({ code: 'runtime.missing' })]
     })
   })

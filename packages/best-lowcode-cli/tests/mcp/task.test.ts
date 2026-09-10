@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { prepareTask } from '../../src/mcp/task'
+import { buildAgentTask } from '../../src/mcp/task'
 
-describe('prepareTask', () => {
+describe('buildAgentTask', () => {
   it('limits its context to manifest capabilities', () => {
-    const task = prepareTask(
+    const task = buildAgentTask(
       '调整 rps.client-ledger.list 的查询条件',
       {
         version: 1,
@@ -55,7 +55,7 @@ describe('prepareTask', () => {
   })
 
   it('allows an explicit low-code opt-out without requiring the BEST CRUD architecture', () => {
-    const task = prepareTask(
+    const task = buildAgentTask(
       '新增 customer-list 页面，不用低代码',
       {
         version: 1,
@@ -69,7 +69,7 @@ describe('prepareTask', () => {
   })
 
   it('blocks a validated low-code selection until it can determine the target page directory', () => {
-    const task = prepareTask(
+    const task = buildAgentTask(
       '调整客户管理功能',
       {
         version: 1,
@@ -87,7 +87,7 @@ describe('prepareTask', () => {
   })
 
   it('adds scaffold context for a new CRUD page request', () => {
-    const task = prepareTask(
+    const task = buildAgentTask(
       '新增 customer-list 页面',
       {
         version: 1,
@@ -121,7 +121,7 @@ describe('prepareTask', () => {
   })
 
   it('maps supported complex requirements to schema and registry coverage', () => {
-    const task = prepareTask(
+    const task = buildAgentTask(
       '新增 customer-list 页面，支持客户来源联动、阶梯定价编辑器和详情授权列表',
       {
         version: 1,
@@ -135,15 +135,21 @@ describe('prepareTask', () => {
     expect(task.questions).toEqual([])
     expect(task.requirementCoverage).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ requirement: '条件联动字段', status: 'supported' }),
-        expect.objectContaining({ requirement: '复杂编辑器或自定义渲染器', status: 'supported' }),
-        expect.objectContaining({ requirement: '详情及详情扩展区', status: 'supported' })
+        expect.objectContaining({ requirement: '条件联动字段', status: 'native-supported' }),
+        expect.objectContaining({ requirement: '复杂编辑器或自定义渲染器', status: 'slot-supported' }),
+        expect.objectContaining({ requirement: '详情及详情扩展区', status: 'slot-supported' })
       ])
     )
+    expect(
+      task.requirementCoverage.find((item) => item.requirement === '详情及详情扩展区')?.fallback
+    ).toMatchObject({
+      selectedFallback: 'runtime-slot',
+      attemptedRuntimeCapability: ['BestDetail', 'detail.fields', 'dataSource.detail', 'registry slots']
+    })
   })
 
   it('blocks implementation when a requirement needs unsupported Runtime capability', () => {
-    const task = prepareTask(
+    const task = buildAgentTask(
       '新增 customer-list 页面，支持阶梯定价编辑器',
       {
         version: 1,
@@ -159,11 +165,58 @@ describe('prepareTask', () => {
         status: 'extension-required'
       })
     )
-    expect(task.questions.join('\n')).toContain('请选择扩展 Runtime 或明确授权手写实现。')
+    expect(task.questions.join('\n')).toContain('请选择扩展 Runtime')
+  })
+
+  it('reports basic detail fields as native Runtime coverage', () => {
+    const task = buildAgentTask(
+      '新增 customer-list 页面，支持客户详情',
+      {
+        version: 1,
+        allowedPaths: ['apps/demo/src/pages'],
+        manifestPaths: ['apps/demo/lowcode.manifest.json']
+      },
+      []
+    )
+
+    expect(task.requirementCoverage).toContainEqual(
+      expect.objectContaining({
+        requirement: '详情基础字段',
+        status: 'native-supported',
+        implementation: expect.objectContaining({
+          schemaPaths: ['/detail/fields', '/dataSource/detail'],
+          runtimeFeatures: ['BestDetail']
+        })
+      })
+    )
+  })
+
+  it('records handwritten fallback details for Runtime unsupported local interactions', () => {
+    const task = buildAgentTask(
+      '新增 customer-list 页面，经营状态关闭原因输入',
+      {
+        version: 1,
+        allowedPaths: ['apps/demo/src/pages'],
+        manifestPaths: ['apps/demo/lowcode.manifest.json']
+      },
+      []
+    )
+
+    expect(task.questions).toEqual([])
+    expect(task.requirementCoverage).toContainEqual(
+      expect.objectContaining({
+        requirement: '经营状态关闭原因输入',
+        status: 'runtime-not-supported',
+        fallback: expect.objectContaining({
+          selectedFallback: 'handwritten-component',
+          attemptedRuntimeCapability: ['confirm', 'runAction', 'BestOverlay']
+        })
+      })
+    )
   })
 
   it('derives src/pages as the page root for the default src allowPath', () => {
-    const task = prepareTask(
+    const task = buildAgentTask(
       '新增 customer-list 页面',
       {
         version: 1,
@@ -176,7 +229,7 @@ describe('prepareTask', () => {
   })
 
   it('allows package infrastructure maintenance without business capabilities', () => {
-    const task = prepareTask(
+    const task = buildAgentTask(
       '维护 best-lowcode-runtime runtime 和 best-lowcode-devtools 测试',
       {
         version: 1,
@@ -197,7 +250,7 @@ describe('prepareTask', () => {
   })
 
   it('locates an existing page from a human-readable Manifest service description', () => {
-    const task = prepareTask(
+    const task = buildAgentTask(
       '调整客户管理功能',
       {
         version: 1,
@@ -219,7 +272,7 @@ describe('prepareTask', () => {
   })
 
   it('reports mode, adapter and repeatable-group requirements as supported runtime capabilities', () => {
-    const task = prepareTask(
+    const task = buildAgentTask(
       '新增 customer-list 页面，新增编辑密码差异、阶梯规则组和 payload 字段映射',
       {
         version: 1,
@@ -231,10 +284,31 @@ describe('prepareTask', () => {
     )
     expect(task.requirementCoverage).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ requirement: '新增、编辑模式差异字段', status: 'supported' }),
-        expect.objectContaining({ requirement: '可重复规则组', status: 'supported' }),
-        expect.objectContaining({ requirement: '数据适配与提交转换', status: 'supported' })
+        expect.objectContaining({ requirement: '新增、编辑模式差异字段', status: 'native-supported' }),
+        expect.objectContaining({ requirement: '可重复规则组', status: 'native-supported' }),
+        expect.objectContaining({ requirement: '数据适配与提交转换', status: 'native-supported' })
       ])
+    )
+  })
+
+  it('classifies repeatable groups as slot-supported when only field slots are available', () => {
+    const task = buildAgentTask(
+      '新增 customer-list 页面，支持阶梯规则组',
+      {
+        version: 1,
+        allowedPaths: ['apps/demo/src/pages'],
+        manifestPaths: ['apps/demo/lowcode.manifest.json']
+      },
+      [],
+      ['builtin.field.slot']
+    )
+
+    expect(task.requirementCoverage).toContainEqual(
+      expect.objectContaining({
+        requirement: '可重复规则组',
+        status: 'slot-supported',
+        fallback: expect.objectContaining({ selectedFallback: 'runtime-slot' })
+      })
     )
   })
 })

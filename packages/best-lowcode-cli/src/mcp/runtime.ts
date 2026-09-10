@@ -65,7 +65,7 @@ async function installCommand(directory: string, rootDir: string, packages: stri
 async function inspectDependencies(directory: string, rootDir: string): Promise<Diagnostic[]> {
   const fail = async (code: string, message: string, packages: string[]) => diagnostic(
     'error', code, `${message}；请在 ${directory} 安装项目依赖后重试。`, directory,
-    { command: await installCommand(directory, rootDir, packages), requiresUserApproval: true, retryTool: 'best_prepare_task' }
+    { command: await installCommand(directory, rootDir, packages), requiresUserApproval: true, retryTool: 'best_get_context' }
   )
   let runtime: PackageJson
   try { runtime = await installedPackage(directory, RUNTIME_PACKAGE) } catch {
@@ -145,7 +145,7 @@ export async function checkProjectRuntime(
       {
         command: await installCommand(rootDir, rootDir, [RUNTIME_PACKAGE]),
         requiresUserApproval: true,
-        retryTool: 'best_prepare_task'
+        retryTool: 'best_get_context'
       }
     )
   ]

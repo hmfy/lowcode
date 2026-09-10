@@ -1,12 +1,17 @@
-import type {
+import {
   CRUD_SCHEMA_ID,
+  TABBED_PAGE_SCHEMA_ID
+} from './schema'
+import type {
   CRUD_SCHEMA_VERSION,
   CrudPageSchema,
   FieldSchema,
-  PageActionSchema
+  PageActionSchema,
+  TABBED_PAGE_SCHEMA_VERSION,
+  TabbedPageSchema
 } from './schema'
 import type { SchemaDiagnostic, SchemaValidationResult } from './validate'
-import { validateCrudPageSchema } from './validate'
+import { validateCrudPageSchema, validateTabbedPageSchema } from './validate'
 
 const builtInCapabilities = [
   'builtin.effect.openCreate',
@@ -88,6 +93,16 @@ function toRuntimeSchema(candidate: JsonRecord): CrudPageSchema {
   }
 }
 
+function toRuntimeTabbedSchema(candidate: JsonRecord): TabbedPageSchema {
+  return {
+    $schema: candidate.$schema as typeof TABBED_PAGE_SCHEMA_ID,
+    version: candidate.version as typeof TABBED_PAGE_SCHEMA_VERSION,
+    id: candidate.id as string,
+    kind: candidate.kind as 'tabs',
+    tabs: candidate.tabs as TabbedPageSchema['tabs']
+  }
+}
+
 /**
  * Server-safe development entry. It accepts unknown JSON from CLI/MCP before delegating to the
  * runtime validator, so untrusted candidates cannot trigger assumptions in typed runtime code.
@@ -98,6 +113,56 @@ export function validateUnknownCrudPageSchema(candidate: unknown): SchemaValidat
     return { valid: false, diagnostics: shapeDiagnostics }
   }
   return validateCrudPageSchema(toRuntimeSchema(candidate))
+}
+
+/** Validates every page schema the Runtime can render without importing React. */
+export function validateUnknownPageSchema(candidate: unknown): SchemaValidationResult {
+  if (!isRecord(candidate)) return validateUnknownCrudPageSchema(candidate)
+  if (candidate.kind === 'crud' || candidate.$schema === CRUD_SCHEMA_ID) {
+    return validateUnknownCrudPageSchema(candidate)
+  }
+  if (candidate.kind !== 'tabs' && candidate.$schema !== TABBED_PAGE_SCHEMA_ID)
+    return validateUnknownCrudPageSchema(candidate)
+  if (!Array.isArray(candidate.tabs) || !candidate.tabs.every(isRecord)) {
+    return {
+      valid: false,
+      diagnostics: [diagnostic('/tabs', 'tabs.type', 'tabs 必须是对象数组')]
+    }
+  }
+  for (const [index, tab] of candidate.tabs.entries()) {
+    const contentPath = `/tabs/${index}/content`
+    if (!isRecord(tab.content)) {
+      return {
+        valid: false,
+        diagnostics: [diagnostic(contentPath, 'tabs.content', 'tab content 必须是 CRUD 或 Slot')]
+      }
+    }
+    if (tab.content.type !== 'crud' && tab.content.type !== 'slot') {
+      return {
+        valid: false,
+        diagnostics: [diagnostic(`${contentPath}/type`, 'tabs.content', 'tab content 必须是 CRUD 或 Slot')]
+      }
+    }
+    if (tab.content.type === 'crud' && !isRecord(tab.content.schema)) {
+      return {
+        valid: false,
+        diagnostics: [diagnostic(`${contentPath}/schema`, 'tabs.content', 'CRUD tab 必须提供对象 schema')]
+      }
+    }
+    if (tab.content.type === 'crud') {
+      const result = validateUnknownCrudPageSchema(tab.content.schema)
+      if (!result.valid) {
+        return {
+          valid: false,
+          diagnostics: result.diagnostics.map((item) => ({
+            ...item,
+            path: `${contentPath}/schema${item.path}`
+          }))
+        }
+      }
+    }
+  }
+  return validateTabbedPageSchema(toRuntimeTabbedSchema(candidate))
 }
 
 /** Serializable capabilities supplied by the current runtime without application Manifest entries. */

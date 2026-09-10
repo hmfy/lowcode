@@ -81,13 +81,27 @@ export type AgentTask = {
 
 export type RequirementCoverage = {
   requirement: string
-  status: 'supported' | 'extension-required' | 'manual-approved'
+  status:
+    | 'native-supported'
+    | 'slot-supported'
+    | 'extension-required'
+    | 'runtime-not-supported'
   implementation: {
     schemaPaths: string[]
     registryKeys: string[]
     runtimeFeatures: string[]
   }
   reason?: string
+  fallback?: {
+    attemptedRuntimeCapability: string[]
+    limitation: string
+    slotEvaluation: string
+    selectedFallback:
+      | 'none'
+      | 'runtime-slot'
+      | 'runtime-extension'
+      | 'handwritten-component'
+  }
 }
 
 export type TaskSelection = {

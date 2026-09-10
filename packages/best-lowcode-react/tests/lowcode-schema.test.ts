@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { CrudPageSchema, TabbedPageSchema } from '../src/lowcode/schema'
 import { TABBED_PAGE_SCHEMA_ID, TABBED_PAGE_SCHEMA_VERSION } from '../src/lowcode/schema'
-import { getBuiltinCapabilities, validateUnknownCrudPageSchema } from '../src/lowcode/dev'
+import {
+  getBuiltinCapabilities,
+  validateUnknownCrudPageSchema,
+  validateUnknownPageSchema
+} from '../src/lowcode/dev'
 import { validateCrudPageSchema, validateTabbedPageSchema } from '../src/lowcode/validate'
 import { composeBestRegistry, createBestRegistry } from '../src/runtime'
 
@@ -213,6 +217,58 @@ describe('lowcode schema', () => {
       services: { 'customer.remove': vi.fn().mockResolvedValue(undefined) }
     })
     expect(validateTabbedPageSchema(schema, registry)).toEqual({ valid: true, diagnostics: [] })
+  })
+
+  it('returns diagnostics instead of throwing for a malformed CRUD tab', () => {
+    expect(() =>
+      validateUnknownPageSchema({
+        $schema: TABBED_PAGE_SCHEMA_ID,
+        version: TABBED_PAGE_SCHEMA_VERSION,
+        id: 'customer-page',
+        kind: 'tabs',
+        tabs: [{ key: 'records', label: '记录', content: { type: 'crud' } }]
+      })
+    ).not.toThrow()
+    expect(
+      validateUnknownPageSchema({
+        $schema: TABBED_PAGE_SCHEMA_ID,
+        version: TABBED_PAGE_SCHEMA_VERSION,
+        id: 'customer-page',
+        kind: 'tabs',
+        tabs: [{ key: 'records', label: '记录', content: { type: 'crud' } }]
+      }).diagnostics
+    ).toContainEqual(expect.objectContaining({ code: 'tabs.content', path: '/tabs/0/content/schema' }))
+  })
+
+  it('returns diagnostics instead of throwing for a malformed nested CRUD shape', () => {
+    const schema = {
+      $schema: TABBED_PAGE_SCHEMA_ID,
+      version: TABBED_PAGE_SCHEMA_VERSION,
+      id: 'customer-page',
+      kind: 'tabs',
+      tabs: [
+        {
+          key: 'records',
+          label: '记录',
+          content: {
+            type: 'crud',
+            schema: {
+              kind: 'crud',
+              dataSource: {},
+              table: { rowKey: 'id', columns: 'invalid' }
+            }
+          }
+        }
+      ]
+    }
+
+    expect(() => validateUnknownPageSchema(schema)).not.toThrow()
+    expect(validateUnknownPageSchema(schema).diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: 'column.list',
+        path: '/tabs/0/content/schema/table/columns'
+      })
+    )
   })
 
   it('rejects empty or duplicate tab keys', () => {

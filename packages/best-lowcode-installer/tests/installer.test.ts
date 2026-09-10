@@ -118,7 +118,10 @@ describe('best-lowcode-installer', () => {
       '& "$env:USERPROFILE\\.best-lowcode\\best.cmd"'
     )
     await expect(readFile(join(homeDir, '.codex', 'skills', 'best-lowcode', 'references', 'workflow.md'), 'utf8')).resolves.toContain(
-      '<best-cli> prepare'
+      '<best-cli> get-context'
+    )
+    await expect(readFile(join(homeDir, '.codex', 'skills', 'best-lowcode', 'references', 'runtime-implementation.md'), 'utf8')).resolves.toContain(
+      'Runtime ownership'
     )
     await expect(access(join(homeDir, '.cursor', 'skills', 'best-lowcode', 'SKILL.md'))).resolves.toBeUndefined()
   })

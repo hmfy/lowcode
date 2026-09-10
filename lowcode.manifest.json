@@ -102,6 +102,6 @@
   },
   "dictionaries": ["status", "tags", "sources", "channels", "pricingModes", "boolean", "warningTypes", "providers", "processStatuses", "chargeStatuses", "providerStatus", "balanceWarningFrequency", "balanceWarningNoticeStatus", "balanceWarningWeekday"],
   "actions": ["customer.toggleStatus", "customer.resetPassword"],
-  "slots": ["customer.tieredPricing", "warning.assign", "provider.apiList", "provider.status", "provider.apiInfo"],
+  "slots": ["customer.tieredPricing", "warning.assign", "provider.apiList", "provider.status", "provider.apiInfo", "customerBalanceWarning.globalConfig"],
   "access": []
 }
