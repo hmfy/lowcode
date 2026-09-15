@@ -60,11 +60,9 @@ function pageNameFromCapabilities(capabilities: string[]) {
   return pageNames.length === 1 ? pageNames[0] : undefined
 }
 
-function pageNameFromRequest(request: string) {
+function pageNameFromCommand(request: string) {
   const commandMatch = request.match(/\bbest\s+page\s+create\s+([a-z][a-z0-9-]*)\b/i)
-  if (commandMatch?.[1]) return commandMatch[1]
-  const pageMatch = request.match(/\b([a-z][a-z0-9-]*)\s+(?:(?:crud\s+)?page\b|页面)/i)
-  return pageMatch?.[1]
+  return commandMatch?.[1]
 }
 
 function isCreatePageRequest(request: string) {
@@ -340,8 +338,7 @@ function buildPageContext(
   const selectedPageDir = selectedPageDirectory(allowedPaths)
   const selectedPageName = selectedPageDir ? posix.basename(selectedPageDir) : undefined
   const pageName =
-    pageNameFromRequest(request) ?? pageNameFromCapabilities(relatedCapabilities) ??
-    selectedPageName
+    selectedPageName ?? pageNameFromCommand(request) ?? pageNameFromCapabilities(relatedCapabilities)
   const recommendedTemplate = isCreatePageRequest(request) ? ('crud' as const) : undefined
   const manifestPath = config.manifestPaths.length === 1 ? config.manifestPaths[0] : undefined
   if (!pageName) {
@@ -417,7 +414,10 @@ export function buildAgentTask(
     )
     .map(({ id }) => id)
   const questions: string[] = []
-  const canScaffoldNewPage = isCreatePageRequest(request) && Boolean(pageNameFromRequest(request))
+  const selectionAllowedPaths = selection?.allowedPaths ?? config.allowedPaths
+  const canScaffoldNewPage =
+    isCreatePageRequest(request) &&
+    Boolean(selectedPageDirectory(selectionAllowedPaths) ?? pageNameFromCommand(request))
   const hasValidatedSelection = selection !== undefined
   const selectedCapabilities = selection?.relatedCapabilities ?? fallbackCapabilities
   const relatedCapabilities = selectedCapabilities
@@ -448,7 +448,7 @@ export function buildAgentTask(
     request,
     config,
     relatedCapabilities,
-    selection?.allowedPaths ?? config.allowedPaths
+    selectionAllowedPaths
   )
   if (pageContextResult.blockedQuestion) questions.push(pageContextResult.blockedQuestion)
   if (

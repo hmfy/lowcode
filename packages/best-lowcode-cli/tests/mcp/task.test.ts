@@ -88,7 +88,7 @@ describe('buildAgentTask', () => {
 
   it('adds scaffold context for a new CRUD page request', () => {
     const task = buildAgentTask(
-      '新增 customer-list 页面',
+      'best page create customer-list',
       {
         version: 1,
         allowedPaths: ['apps/demo/src/pages'],
@@ -217,7 +217,7 @@ describe('buildAgentTask', () => {
 
   it('derives src/pages as the page root for the default src allowPath', () => {
     const task = buildAgentTask(
-      '新增 customer-list 页面',
+      'best page create customer-list',
       {
         version: 1,
         allowedPaths: ['src'],
@@ -226,6 +226,29 @@ describe('buildAgentTask', () => {
       []
     )
     expect(task.pageContext.pageDir).toBe('src/pages/customer-list')
+  })
+
+  it('does not infer page directories from prose before page or 页面', () => {
+    const task = buildAgentTask(
+      '重构 SharedProTable 页面为 CRUD 页面，ClientLedger page 只描述组件名',
+      {
+        version: 1,
+        allowedPaths: ['apps/rps/src/pages/client-ledger'],
+        manifestPaths: ['apps/rps/lowcode.manifest.json']
+      },
+      [],
+      [],
+      {
+        relatedCapabilities: ['builtin.field.input', 'builtin.field.select'],
+        allowedPaths: ['apps/rps/src/pages/client-ledger']
+      }
+    )
+
+    expect(task.pageContext).toMatchObject({
+      pageName: 'client-ledger',
+      pageDir: 'apps/rps/src/pages/client-ledger'
+    })
+    expect(task.questions).toEqual([])
   })
 
   it('allows package infrastructure maintenance without business capabilities', () => {

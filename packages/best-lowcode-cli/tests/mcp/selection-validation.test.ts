@@ -103,7 +103,7 @@ describe('selection validation', () => {
     )
   })
 
-  it('allows an empty selection for a new scaffold request', async () => {
+  it('uses a precise selected path instead of inferring a page name from prose', async () => {
     const service = createBestLowcodeMcpService(await createProject())
 
     const result = await service.validateSelection('新增 customer-list 页面', {
@@ -113,11 +113,28 @@ describe('selection validation', () => {
 
     expect(result.task?.relatedCapabilities).toEqual([])
     expect(result.task?.pageContext).toMatchObject({
-      pageName: 'customer-list',
+      pageName: 'client-ledger',
+      pageDir: 'apps/rps/src/pages/client-ledger',
       recommendedTemplate: 'crud'
     })
-    expect(result.task?.blockedQuestions).toContain(
-      '推导出的页面目录 apps/rps/src/pages/customer-list 不在 AgentTask.allowedPaths 范围内，请确认 allowedPaths 或重新指定页面目录。'
+    expect(result.task?.blockedQuestions).toEqual([])
+  })
+
+  it('does not let technical prose override the selected page directory', async () => {
+    const service = createBestLowcodeMcpService(await createProject())
+
+    const result = await service.validateSelection(
+      '将 SharedProTable 页面迁移为 BEST CRUD 页面，ClientLedger page 只是组件描述',
+      {
+        relatedCapabilities: ['rps.client-ledger.list'],
+        allowedPaths: ['apps/rps/src/pages/client-ledger']
+      }
     )
+
+    expect(result.task?.pageContext).toMatchObject({
+      pageName: 'client-ledger',
+      pageDir: 'apps/rps/src/pages/client-ledger'
+    })
+    expect(result.task?.blockedQuestions).toEqual([])
   })
 })

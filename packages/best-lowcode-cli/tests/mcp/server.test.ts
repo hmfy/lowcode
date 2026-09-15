@@ -92,7 +92,7 @@ describe('best lowcode MCP server', () => {
       await connection.client.callTool({
         name: 'best_validate_selection',
         arguments: {
-          request: '新增 customer-list 页面',
+          request: 'best page create customer-list',
           relatedCapabilities: [],
           allowedPaths: ['apps/demo']
         }
