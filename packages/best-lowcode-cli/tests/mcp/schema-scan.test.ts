@@ -52,6 +52,23 @@ export async function viewTransactions() { return undefined }
   return root
 }
 
+async function createRuntimeSourceProject(packagePath: string) {
+  const root = await mkdtemp(join(tmpdir(), 'best-lowcode-runtime-scan-'))
+  const runtimeRoot = join(root, packagePath)
+  await mkdir(runtimeRoot, { recursive: true })
+  await writeFile(
+    join(root, 'best.lowcode.config.json'),
+    JSON.stringify({ version: 1, allowedPaths: [packagePath], manifestPaths: ['manifest.json'] })
+  )
+  await writeFile(join(root, 'manifest.json'), JSON.stringify({ version: 1 }))
+  await writeFile(join(runtimeRoot, 'package.json'), JSON.stringify({ name: 'best-lowcode-runtime' }))
+  await writeFile(
+    join(runtimeRoot, 'schema.ts'),
+    `${schemaPrefix}\nexport const pageSchema = { kind: 'crud', title: 'Runtime schema' }\n`
+  )
+  return root
+}
+
 const schemaPrefix = `
 import { CRUD_SCHEMA_ID, CRUD_SCHEMA_VERSION, type CrudPageSchema } from 'best-lowcode-runtime'
 `
@@ -77,6 +94,18 @@ export const pageSchema = {
 }
 
 describe('TypeScript schema verification', () => {
+  it('recognizes Runtime source by package identity instead of its directory name', async () => {
+    const root = await createRuntimeSourceProject('vendor/embedded-runtime')
+    const result = await createBestLowcodeMcpService(root, bestLowcodeAdapter).verify()
+
+    expect(result.diagnostics).not.toContainEqual(
+      expect.objectContaining({ code: 'architecture.file.missing' })
+    )
+    expect(result.diagnostics).not.toContainEqual(
+      expect.objectContaining({ code: 'architecture.component.missing' })
+    )
+  })
+
   it('accepts schema references registered in Manifest or built-ins', async () => {
     const service = createBestLowcodeMcpService(
       await createProject(

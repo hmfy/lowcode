@@ -256,20 +256,20 @@ describe('buildAgentTask', () => {
       '维护 best-lowcode-runtime runtime 和 best-lowcode-devtools 测试',
       {
         version: 1,
-        allowedPaths: ['packages/best-lowcode-react', 'packages/best-lowcode-cli'],
+        allowedPaths: ['packages/best-lowcode-runtime', 'packages/best-lowcode-cli'],
         manifestPaths: ['apps/rps/lowcode.manifest.json']
       },
       [],
       [],
       {
         relatedCapabilities: [],
-        allowedPaths: ['packages/best-lowcode-react', 'packages/best-lowcode-cli']
+        allowedPaths: ['packages/best-lowcode-runtime', 'packages/best-lowcode-cli']
       }
     )
 
     expect(task.questions).toEqual([])
     expect(task.relatedCapabilities).toEqual([])
-    expect(task.allowedPaths).toEqual(['packages/best-lowcode-react', 'packages/best-lowcode-cli'])
+    expect(task.allowedPaths).toEqual(['packages/best-lowcode-runtime', 'packages/best-lowcode-cli'])
   })
 
   it('locates an existing page from a human-readable Manifest service description', () => {

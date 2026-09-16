@@ -19,7 +19,7 @@ importers:
         version: 6.6.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       best-lowcode-runtime:
         specifier: workspace:*
-        version: link:packages/best-lowcode-react
+        version: link:packages/best-lowcode-runtime
       dayjs:
         specifier: ^1.11.19
         version: 1.11.23
@@ -75,7 +75,7 @@ importers:
         version: 7.8.0
       best-lowcode-runtime:
         specifier: workspace:*
-        version: link:../best-lowcode-react
+        version: link:../best-lowcode-runtime
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
@@ -92,7 +92,7 @@ importers:
         specifier: ^4.20.3
         version: 4.23.13
 
-  packages/best-lowcode-react:
+  packages/best-lowcode-runtime:
     dependencies:
       '@ant-design/pro-components':
         specifier: ^3.1.5-0
