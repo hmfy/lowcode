@@ -32,6 +32,7 @@ describe('buildAgentTask', () => {
       files: [
         'apps/rps/src/pages/client-ledger/schema.ts',
         'apps/rps/src/pages/client-ledger/registry.ts',
+        'apps/rps/src/pages/client-ledger/slots/index.ts',
         'apps/rps/src/pages/client-ledger/index.tsx'
       ]
     })
@@ -50,7 +51,7 @@ describe('buildAgentTask', () => {
     expect(task.blockedQuestions).toEqual([])
     expect(task.questions).toEqual([])
     expect(task.acceptance).toContain(
-      '页面采用 BestProvider + BestCrudPage，并包含 schema.ts 与 registry.ts'
+      '页面采用 BestProvider + BestCrudPage，并包含 schema.ts、registry.ts 与 slots/index.ts'
     )
   })
 
@@ -112,6 +113,7 @@ describe('buildAgentTask', () => {
         'apps/demo/src/pages/customer-list/schema.ts',
         'apps/demo/src/pages/customer-list/adapter.ts',
         'apps/demo/src/pages/customer-list/registry.ts',
+        'apps/demo/src/pages/customer-list/slots/index.ts',
         'apps/demo/src/pages/customer-list/index.tsx'
       ]
     })

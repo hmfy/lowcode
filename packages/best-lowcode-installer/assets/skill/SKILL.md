@@ -52,7 +52,8 @@ is not evidence that an extension is required and never authorizes a handwritten
    and the selected fallback.
 7. Before changing a Schema or Manifest, call `best_preview_change`. Implement the returned
    `AgentTask`: the visible CRUD page must use `BestProvider` and `BestCrudPage`, with `schema.ts`,
-   `adapter.ts`, `registry.ts`, and `index.tsx` for a new page. If MCP is unavailable, run
+   `adapter.ts`, `registry.ts`, `index.tsx`, and `slots/index.ts` for a new page. Feature-specific
+   Runtime Slots belong under the page's `slots/` directory. If MCP is unavailable, run
    `<best-cli> preview-change <target-path> --candidate-file <path> --language <auto|ts|json>` instead.
 8. Call `best_verify`, then the `AgentTask.verificationCommands` and relevant project checks before
    reporting completion. If MCP is unavailable, run `<best-cli> verify` instead.

@@ -16,6 +16,28 @@ Use these file boundaries:
 - `registry.ts`: services, dictionaries, actions, slots, and access checks.
 - `index.tsx`: Runtime assembly only.
 
+Feature Slot organization:
+
+- Put every business-specific Runtime Slot for a feature under that feature's `slots/` directory.
+- Use `slots/index.ts` as the barrel that maps Slot keys to local components, and expose that map
+  through `createBestSlotRegistry` from Runtime in `registry.ts`.
+- Do not place feature Slots beside `schema.ts`, `adapter.ts`, or `registry.ts`, and do not render
+  them directly from `index.tsx` when the surrounding page behavior belongs to Runtime.
+
+Example:
+
+```text
+orders/
+├── schema.ts
+├── adapter.ts
+├── registry.ts
+├── index.tsx
+└── slots/
+    ├── index.ts
+    ├── OrderStatus.tsx
+    └── OrderExtraInfo.tsx
+```
+
 ## Capability order
 
 Prefer capabilities in this order:

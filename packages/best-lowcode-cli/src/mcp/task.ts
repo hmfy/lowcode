@@ -372,7 +372,13 @@ function buildPageContext(
   const schemaPath = posix.join(pageDir, schemaFileName(config.schemaFilePattern))
   const registryPath = posix.join(pageDir, 'registry.ts')
   const indexPath = posix.join(pageDir, 'index.tsx')
-  const scaffoldFiles = [schemaPath, posix.join(pageDir, 'adapter.ts'), registryPath, indexPath]
+  const scaffoldFiles = [
+    schemaPath,
+    posix.join(pageDir, 'adapter.ts'),
+    registryPath,
+    posix.join(pageDir, 'slots/index.ts'),
+    indexPath
+  ]
   return {
     pageContext: {
       pageName,
@@ -478,6 +484,7 @@ export function buildAgentTask(
               ? [
                   posix.join(pageContextResult.pageContext.pageDir, 'schema.ts'),
                   posix.join(pageContextResult.pageContext.pageDir, 'registry.ts'),
+                  posix.join(pageContextResult.pageContext.pageDir, 'slots/index.ts'),
                   posix.join(pageContextResult.pageContext.pageDir, 'index.tsx')
                 ]
               : []
@@ -490,7 +497,7 @@ export function buildAgentTask(
       'MCP 配置与 Manifest 校验通过',
       ...(isInfrastructureMaintenance || isLowcodeOptOut
         ? []
-        : ['页面采用 BestProvider + BestCrudPage，并包含 schema.ts 与 registry.ts']),
+        : ['页面采用 BestProvider + BestCrudPage，并包含 schema.ts、registry.ts 与 slots/index.ts']),
       ...verificationCommands
     ],
     questions
