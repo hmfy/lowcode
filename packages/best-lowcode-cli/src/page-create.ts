@@ -1,5 +1,5 @@
 import { access, mkdir, writeFile } from 'node:fs/promises'
-import { basename, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import {
   type Diagnostic,
   diagnostic,
@@ -171,8 +171,10 @@ function createRegistryTemplate(input: {
 }) {
   const listFunction = `list${input.itemType.replace(/Item$/, '')}`
   const removeFunction = `remove${input.itemType}`
-  return `import type { BestProviderProps } from 'best-lowcode-runtime'
+  const pageVariable = input.registryVariable.replace(/Registry$/, '')
+  return `import { createBestSlotRegistry, type BestProviderProps } from 'best-lowcode-runtime'
 import { ${listFunction}, ${removeFunction} } from './adapter'
+import { ${pageVariable}Slots } from './slots'
 
 export const ${input.registryVariable} = {
   listServices: {
@@ -188,9 +190,20 @@ export const ${input.registryVariable} = {
     ]
   },
   actions: {},
-  slots: {},
+  slots: createBestSlotRegistry(${pageVariable}Slots),
   access: () => true
 } satisfies BestProviderProps['registry']
+`
+}
+
+function createSlotsIndexTemplate(input: { slotVariable: string }) {
+  return `import type { BestSlotRegistry } from 'best-lowcode-runtime'
+
+// Keep all Runtime dynamic Slots for this feature under ./slots/*.tsx.
+// Add each Slot component import and mapping here, for example:
+// import { OrderStatus } from './OrderStatus'
+// export const ${input.slotVariable} = { 'order.status': OrderStatus } satisfies BestSlotRegistry
+export const ${input.slotVariable} = {} satisfies BestSlotRegistry
 `
 }
 
@@ -225,6 +238,7 @@ function createCrudTemplates(options: {
   const componentName = `${baseName}Page`
   const itemType = `${baseName}Item`
   const registryVariable = `${camelCase(options.name)}Registry`
+  const slotVariable = `${camelCase(options.name)}Slots`
   const schemaVariable = `${camelCase(options.name)}Schema`
   return [
     {
@@ -243,6 +257,10 @@ function createCrudTemplates(options: {
         itemType,
         registryVariable
       })
+    },
+    {
+      name: 'slots/index.ts',
+      content: createSlotsIndexTemplate({ slotVariable })
     },
     {
       name: 'index.tsx',
@@ -326,6 +344,7 @@ export async function createPage(
     return { written: false, pageName: options.name, targetDir, files, diagnostics }
   }
   await mkdir(resolvedTarget, { recursive: true })
+  await Promise.all(files.map((file) => mkdir(dirname(resolve(rootDir, file.path)), { recursive: true })))
   await Promise.all(
     files.map((file) => writeFile(resolve(rootDir, file.path), file.content, 'utf8'))
   )

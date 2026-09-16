@@ -9,11 +9,13 @@ export type {
   BestRegistryLayer,
   BestService,
   BestSlot,
-  BestSlotContext
+  BestSlotContext,
+  BestSlotRegistry
 } from './BestProvider'
 export {
   BestProvider,
   composeBestRegistry,
+  createBestSlotRegistry,
   createBestRegistry,
   useBestAccess,
   useBestAction,

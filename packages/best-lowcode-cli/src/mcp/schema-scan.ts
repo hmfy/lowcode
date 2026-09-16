@@ -12,6 +12,12 @@ function jsxName(tagName: ts.JsxTagNameExpression) {
   return ts.isIdentifier(tagName) ? tagName.text : undefined
 }
 
+function propertyName(name: ts.PropertyName) {
+  return ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)
+    ? name.text
+    : undefined
+}
+
 function hasHiddenAttribute(opening: ts.JsxOpeningLikeElement) {
   return opening.attributes.properties.some((property) => {
     if (!ts.isJsxAttribute(property)) return false
@@ -352,6 +358,58 @@ function validateRegistryAdapterBindings(
         )
       )
     }
+    }
+  }
+}
+
+function validateFeatureSlotOrganization(
+  registryContent: string,
+  registryPath: string,
+  registryBindings: Set<string>,
+  diagnostics: Diagnostic[],
+  relativePath: string
+) {
+  const source = ts.createSourceFile(registryPath, registryContent, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const slotModuleBindings = moduleImportBindings(source, './slots')
+  const runtimeBindings = moduleImportBindings(source, 'best-lowcode-runtime')
+  const usesSlotRegistryHelper = runtimeBindings.has('createBestSlotRegistry')
+  for (const registryBinding of registryBindings) {
+    const declaration = source.statements
+      .filter(ts.isVariableStatement)
+      .flatMap((statement) => [...statement.declarationList.declarations])
+      .find((item) => ts.isIdentifier(item.name) && item.name.text === registryBinding)
+    const initializer = declaration?.initializer && unwrapExpression(declaration.initializer)
+    if (!initializer || !ts.isObjectLiteralExpression(initializer)) continue
+    const slots = initializer.properties.find(
+      (property) => ts.isPropertyAssignment(property) && propertyName(property.name) === 'slots'
+    )
+    if (!slots || !ts.isPropertyAssignment(slots)) continue
+    const value = unwrapExpression(slots.initializer)
+    if (!ts.isCallExpression(value) || !ts.isIdentifier(value.expression) || value.expression.text !== 'createBestSlotRegistry') {
+      if (ts.isObjectLiteralExpression(value) && value.properties.length) {
+        diagnostics.push(
+          diagnostic(
+            'warning',
+            'architecture.slot.migrate',
+            '检测到 registry.ts 内联 Slot；新页面应将动态 Slot 放入 slots/ 并通过 createBestSlotRegistry 接入。',
+            relativePath
+          )
+        )
+      }
+      continue
+    }
+    const validFeatureSlotArgument = value.arguments.some(
+      (argument) => ts.isIdentifier(argument) && slotModuleBindings.has(argument.text)
+    )
+    if (!usesSlotRegistryHelper || !validFeatureSlotArgument) {
+      diagnostics.push(
+        diagnostic(
+          'error',
+          'architecture.slot.registry.invalid',
+          'registry.ts 的 Slot 必须通过从 ./slots 导入的映射调用 createBestSlotRegistry。',
+          relativePath
+        )
+      )
     }
   }
 }
@@ -707,6 +765,13 @@ export async function scanTypeScriptSchemas(
           // Every Provider branch that can render this schema must have a
           // complete mapping; a valid sibling registry cannot mask a broken one.
           // An empty set is already reported by validateIndexBindings.
+          indexBindings.registryBindings,
+          diagnostics,
+          relativePath
+        )
+        validateFeatureSlotOrganization(
+          registryContent,
+          registryPath,
           indexBindings.registryBindings,
           diagnostics,
           relativePath

@@ -20,6 +20,7 @@ export type BestSlotContext = {
 export type BestActionContext = BestSlotContext
 export type BestAction = (context: BestActionContext) => void | Promise<void>
 export type BestSlot = (context: BestSlotContext) => ReactNode
+export type BestSlotRegistry = Record<string, BestSlot>
 
 export type BestRegistry = {
   /** List services use the stable low-code pagination contract. */
@@ -28,7 +29,7 @@ export type BestRegistry = {
   services: Record<string, BestService>
   dictionaries: Record<string, BestDictionaryItem[]>
   actions: Record<string, BestAction>
-  slots: Record<string, BestSlot>
+  slots: BestSlotRegistry
   access: (key: string) => boolean
 }
 
@@ -88,6 +89,18 @@ export function composeBestRegistry(...layers: BestRegistryLayer[]): BestRegistr
     if (layer.access) {
       const previousAccess = result.access
       result.access = (key) => previousAccess(key) && layer.access?.(key) !== false
+    }
+  }
+  return result
+}
+
+/** Compose feature-local Runtime Slots and reject duplicate Slot keys. */
+export function createBestSlotRegistry(...layers: BestSlotRegistry[]): BestSlotRegistry {
+  const result: BestSlotRegistry = {}
+  for (const layer of layers) {
+    for (const [key, slot] of Object.entries(layer)) {
+      if (Object.hasOwn(result, key)) throw new Error(`Slot key 重复：${key}`)
+      result[key] = slot
     }
   }
   return result

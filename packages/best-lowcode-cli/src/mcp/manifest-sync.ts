@@ -173,6 +173,45 @@ function collectRegistryCapabilities(sourceFile: ts.SourceFile): CapabilitySets 
   return capabilities
 }
 
+async function collectFeatureSlotCapabilities(
+  registryPath: string,
+  registryContent: string,
+  capabilities: CapabilitySets
+) {
+  const source = ts.createSourceFile(registryPath, registryContent, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const slotImports = new Set<string>()
+  for (const statement of source.statements) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue
+    if (statement.moduleSpecifier.text !== './slots') continue
+    const namedBindings = statement.importClause?.namedBindings
+    if (namedBindings && ts.isNamedImports(namedBindings)) {
+      for (const element of namedBindings.elements) slotImports.add(element.name.text)
+    }
+  }
+  if (!slotImports.size) return
+  const slotIndexPath = resolve(dirname(registryPath), 'slots/index.ts')
+  let slotIndexContent: string
+  try {
+    slotIndexContent = await readFile(slotIndexPath, 'utf8')
+  } catch {
+    return
+  }
+  const slotSource = ts.createSourceFile(slotIndexPath, slotIndexContent, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  for (const statement of slotSource.statements) {
+    if (!ts.isVariableStatement(statement)) continue
+    for (const declaration of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(declaration.name) || !slotImports.has(declaration.name.text)) continue
+      const value = declaration.initializer && unwrap(declaration.initializer)
+      if (!value || !ts.isObjectLiteralExpression(value)) continue
+      for (const property of value.properties) {
+        if (!ts.isPropertyAssignment(property)) continue
+        const name = propertyName(property.name)
+        if (name) capabilities.slots.add(name)
+      }
+    }
+  }
+}
+
 async function collectSchemaFiles(rootDir: string, config: ProjectConfig) {
   const pattern = config.schemaFilePattern ?? 'schema.ts'
   const files: string[] = []
@@ -212,9 +251,11 @@ async function readPageRegistry(schemaPath: string) {
       pagePath = indexPath
       content = indexContent
     }
-    return collectRegistryCapabilities(
+    const capabilities = collectRegistryCapabilities(
       ts.createSourceFile(pagePath, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
     )
+    await collectFeatureSlotCapabilities(pagePath, content, capabilities)
+    return capabilities
   } catch {
     return undefined
   }

@@ -2,7 +2,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { type ReactNode, useEffect } from 'react'
 import { describe, expect, it } from 'vitest'
-import { BestProvider, useBestDictionary, useBestDictionaryActions } from '../src/runtime'
+import { BestProvider, createBestSlotRegistry, useBestDictionary, useBestDictionaryActions } from '../src/runtime'
 
 function AsyncDictionaryUpdater() {
   const { setDictionary } = useBestDictionaryActions()
@@ -23,5 +23,14 @@ describe('BestProvider dictionary updates', () => {
     renderProvider(<AsyncDictionaryUpdater />)
 
     await waitFor(() => expect(screen.getByText('启用')).toBeTruthy())
+  })
+})
+
+describe('feature Slot registry', () => {
+  it('composes local Slot maps and rejects duplicate keys', () => {
+    const first = () => null
+    const second = () => null
+    expect(createBestSlotRegistry({ 'order.status': first })).toEqual({ 'order.status': first })
+    expect(() => createBestSlotRegistry({ 'order.status': first }, { 'order.status': second })).toThrow('Slot key 重复')
   })
 })

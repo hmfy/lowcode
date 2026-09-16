@@ -50,6 +50,7 @@ describe('best page create', () => {
       'apps/demo/src/pages/customer-list/schema.ts',
       'apps/demo/src/pages/customer-list/adapter.ts',
       'apps/demo/src/pages/customer-list/registry.ts',
+      'apps/demo/src/pages/customer-list/slots/index.ts',
       'apps/demo/src/pages/customer-list/index.tsx'
     ])
     expect(result.files[0].content).toContain("title: '客户列表'")
@@ -57,9 +58,9 @@ describe('best page create', () => {
     expect(result.files[1].content).toContain('export async function listCustomerList')
     expect(result.files[1].content).toContain('BestListResult<CustomerListItem>')
     expect(result.files[2].content).toContain("'customer-list.remove': removeCustomerListItem")
-    await expect(
-      readFile(join(root, 'apps/demo/src/pages/customer-list/schema.ts'), 'utf8')
-    ).rejects.toThrow()
+    expect(result.files[2].content).toContain("import { customerListSlots } from './slots'")
+    expect(result.files[3].content).toContain('BestSlotRegistry')
+    await expect(readFile(join(root, 'apps/demo/src/pages/customer-list/schema.ts'), 'utf8')).rejects.toThrow()
   })
 
   it('writes scaffold files only when requested', async () => {
@@ -89,6 +90,9 @@ describe('best page create', () => {
     await expect(
       readFile(join(root, 'apps/demo/src/pages/order-list/index.tsx'), 'utf8')
     ).resolves.toContain('<BestCrudPage schema={orderListSchema} />')
+    await expect(
+      readFile(join(root, 'apps/demo/src/pages/order-list/slots/index.ts'), 'utf8')
+    ).resolves.toContain('orderListSlots')
   })
 
   it('refuses to overwrite existing scaffold files', async () => {

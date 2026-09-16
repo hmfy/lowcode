@@ -64,7 +64,7 @@ describe('controlled low-code workflow', () => {
       questions: [],
       acceptance: [
         'MCP 配置与 Manifest 校验通过',
-        '页面采用 BestProvider + BestCrudPage，并包含 schema.ts 与 registry.ts',
+      '页面采用 BestProvider + BestCrudPage，并包含 schema.ts、registry.ts 与 slots/index.ts',
         'node -e "process.exit(0)"'
       ]
     })
