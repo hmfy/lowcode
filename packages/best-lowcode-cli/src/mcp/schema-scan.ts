@@ -88,6 +88,25 @@ type IndexRuntimeBindings = {
   registryBindings: Set<string>
 }
 
+const RUNTIME_PACKAGE_NAME = 'best-lowcode-runtime'
+
+async function belongsToRuntimePackage(rootDir: string, filePath: string) {
+  const root = resolve(rootDir)
+  for (let directory = dirname(filePath); ; directory = dirname(directory)) {
+    try {
+      const packageJson = JSON.parse(await readFile(resolve(directory, 'package.json'), 'utf8')) as {
+        name?: unknown
+      }
+      return packageJson.name === RUNTIME_PACKAGE_NAME
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return false
+    }
+    if (directory === root) return false
+    const parent = dirname(directory)
+    if (parent === directory) return false
+  }
+}
+
 function unwrapExpression(node: ts.Expression): ts.Expression {
   while (
     ts.isParenthesizedExpression(node) ||
@@ -603,7 +622,7 @@ export async function scanTypeScriptSchemas(
     const pageDir = resolve(filePath, '..')
     const registryPath = resolve(pageDir, 'registry.ts')
     const indexPath = resolve(pageDir, 'index.tsx')
-    const isRuntimeSource = relativePath.startsWith('packages/best-lowcode-react/')
+    const isRuntimeSource = await belongsToRuntimePackage(rootDir, filePath)
     let content: string
     try {
       content = await readFile(filePath, 'utf8')

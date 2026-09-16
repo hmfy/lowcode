@@ -1,6 +1,6 @@
 export type { BestBatchInputProps, BestBatchInputRef } from './BestBatchInput'
 export { BestBatchInput } from './BestBatchInput'
-export type { BestDetailProps } from './BestDetail'
+export type { BestDetailProps, BestDetailSection, BestDetailTable } from './BestDetail'
 export { BestDetail } from './BestDetail'
 export type { BestFileItem, BestFilePreviewProps } from './BestFilePreview'
 export { BestFilePreview } from './BestFilePreview'

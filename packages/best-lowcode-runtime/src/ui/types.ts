@@ -71,5 +71,8 @@ export type BestDetailField = {
   label: string
   span?: number
   valueEnum?: Record<string, ReactNode>
+  format?: string | { type: string; emptyText?: string; precision?: number }
+  emptyText?: string
+  visible?: boolean
   render?: (value: unknown, record: Record<string, unknown>) => ReactNode
 }

@@ -6,14 +6,19 @@ import { useBestListService, useBestRegistry } from '../runtime'
 import {
   BestDetail,
   type BestDetailField,
+  type BestDetailSection,
   type BestFieldDefinition,
+  BestDrawer,
+  BestEmpty,
+  BestError,
+  BestLoading,
   BestForm,
   BestModal,
   BestSearch,
   BestTable,
   type BestTableColumn
 } from '../ui'
-import { getDefaultValues } from '../ui/BestForm'
+import { evaluateCondition, getDefaultValues } from '../ui/BestForm'
 import {
   confirmBeforeAction,
   createLatestPageRequest,
@@ -25,6 +30,7 @@ import {
 import type {
   CrudPageSchema,
   DetailFieldSchema,
+  DetailSectionSchema,
   FieldSchema,
   FormMode,
   PageActionSchema,
@@ -48,6 +54,7 @@ export type CrudDataAdapter = {
 }
 
 type DrawerState = { mode: 'closed' } | { mode: 'detail' | 'edit' | 'create'; record?: RecordValue }
+type DetailState = { loading: boolean; error?: unknown; record?: RecordValue }
 
 function pickRowKeyValues(record: RecordValue | undefined, rowKey: string | string[]) {
   if (!record) return {}
@@ -146,7 +153,8 @@ function useFields(fields: FieldSchema[] = []) {
 function toDetailField(
   field: DetailFieldSchema,
   dictionary: Record<string, { label: string; value: string | number }[]>,
-  slots: ReturnType<typeof useBestRegistry>['slots']
+  slots: ReturnType<typeof useBestRegistry>['slots'],
+  record: RecordValue = {}
 ): BestDetailField {
   const slot = field.slot
   const valueEnum = field.dict
@@ -158,11 +166,62 @@ function toDetailField(
     field: field.field,
     label: field.label,
     span: field.span,
+    format: field.format,
+    emptyText: field.emptyText,
+    visible: !field.visibleWhen || evaluateCondition(field.visibleWhen, record, 'detail'),
     valueEnum,
     render: slot
       ? (value, record) => slots[slot]?.({ field: field.field, record, value }) ?? '-'
       : undefined
   }
+}
+
+function getPathValue(values: RecordValue, path: string) {
+  if (Object.hasOwn(values, path)) return values[path]
+  return path.split('.').reduce<unknown>((current, part) => {
+    if (current && typeof current === 'object') return (current as RecordValue)[part]
+    return undefined
+  }, values)
+}
+
+function toDetailSection(
+  section: DetailSectionSchema,
+  record: RecordValue,
+  dictionaries: ReturnType<typeof useBestRegistry>['dictionaries'],
+  slots: ReturnType<typeof useBestRegistry>['slots']
+): BestDetailSection | null {
+  if (section.visibleWhen && !evaluateCondition(section.visibleWhen, record, 'detail')) return null
+  const fields = section.fields?.map((field) => toDetailField(field, dictionaries, slots, record))
+  const table = section.table
+    ? {
+        key: section.key,
+        data: (getPathValue(record, section.table.data) as RecordValue[]) ?? [],
+        rowKey: section.table.rowKey,
+        scrollX: section.table.scrollX,
+        columns: section.table.columns.map((column) => ({
+          key: column.field,
+          title: column.title,
+          dataIndex: column.field,
+          width: column.width,
+          fixed: column.fixed,
+          render: (value: unknown, row: RecordValue) => {
+            if (column.slot) return slots[column.slot]?.({ field: column.field, record: row, value }) ?? '-'
+            if (column.dict) {
+              const item = (dictionaries[column.dict] ?? []).find((candidate) => candidate.value === value)
+              if (item) return item.label
+            }
+            const format = column.format
+            if (format === 'date' || format === 'datetime') return formatCrudValue(value, format)
+            if (format === 'money') return formatCrudValue(value, format)
+            return value == null || value === '' ? '-' : String(value)
+          }
+        }))
+      }
+    : undefined
+  const content = section.layout === 'slot' && section.slot
+    ? slots[section.slot]?.({ record })
+    : undefined
+  return { key: section.key, title: section.title, description: section.description, columns: section.columns, span: section.span, variant: section.variant, fields, table, content }
 }
 
 function toTableColumn(
@@ -290,15 +349,47 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
     userTouched: false
   })
   const [drawer, setDrawer] = useState<DrawerState>({ mode: 'closed' })
+  const [detailState, setDetailState] = useState<DetailState>({ loading: false })
+  const detailRequestRef = useRef<AbortController | undefined>(undefined)
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
 
   const handleAction = useCallback(
     async (action: PageActionSchema, record?: RecordValue) => {
       if (action.access && !registry.access(action.access)) return
+      if (action.effect === 'closeDetail') {
+        detailRequestRef.current?.abort()
+        setDrawer({ mode: 'closed' })
+        setDetailState({ loading: false })
+        return
+      }
       if (action.effect !== 'remove' && !(await confirmBeforeAction(action.confirm, confirmAction)))
         return
-      if (action.effect === 'openDetail') setDrawer({ mode: 'detail', record })
+      if (action.effect === 'openDetail') {
+        detailRequestRef.current?.abort()
+        const controller = new AbortController()
+        detailRequestRef.current = controller
+        setDrawer({ mode: 'detail', record })
+        setDetailState({ loading: Boolean(schema.dataSource.detail), record })
+        if (schema.dataSource.detail) {
+          const detailService = registry.services[schema.dataSource.detail]
+          if (!detailService) {
+            setDetailState({ loading: false, error: new Error(`未注册服务：${schema.dataSource.detail}`), record })
+            return
+          }
+          try {
+            const detail = await detailService(record ?? {}, { signal: controller.signal })
+            if (controller.signal.aborted) return
+            const normalized = isRecord(detail)
+              ? adapter?.fromDetail ? adapter.fromDetail(detail) : detail
+              : record ?? {}
+            setDetailState({ loading: false, record: normalized })
+            setDrawer({ mode: 'detail', record: normalized })
+          } catch (error) {
+            if (!controller.signal.aborted) setDetailState({ loading: false, error, record })
+          }
+        }
+      }
       if (action.effect === 'openEdit') {
         let editRecord = record
         if (schema.dataSource.detail) {
@@ -528,8 +619,21 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
           )) ?? []
         }
       />
-      <BestModal
-        open={drawer.mode !== 'closed'}
+      {drawer.mode === 'detail' && schema.detail?.mode === 'inline' ? (
+        <DetailContent state={detailState} record={drawer.record} />
+      ) : null}
+      {drawer.mode !== 'closed' && (schema.detail?.mode !== 'inline' || drawer.mode !== 'detail') && schema.detail?.mode === 'drawer' ? <BestDrawer
+        open
+        width={schema.detail.width}
+        title={drawer.mode === 'detail' ? `${schema.title}详情` : drawer.mode === 'edit' ? `编辑${schema.title}` : `新建${schema.title}`}
+        footer={drawer.mode === 'detail' && schema.detail.footer?.length ? <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>{schema.detail.footer.map((action) => <ActionButton action={action} key={action.id} record={drawer.record} onExecute={handleAction} />)}</div> : undefined}
+        onClose={() => { detailRequestRef.current?.abort(); setDrawer({ mode: 'closed' }); setDetailState({ loading: false }) }}
+      >
+        {drawer.mode === 'detail' ? <DetailContent state={detailState} record={drawer.record} /> : null}
+        {drawer.mode === 'edit' || drawer.mode === 'create' ? <BestForm fields={formFields} initialValues={drawer.record} loading={submitting} mode={drawer.mode as FormMode} onCancel={() => setDrawer({ mode: 'closed' })} onSubmit={(values) => { void submitForm(values) }} /> : null}
+      </BestDrawer> : null}
+      {drawer.mode !== 'closed' && (schema.detail?.mode !== 'inline' || drawer.mode !== 'detail') && schema.detail?.mode !== 'drawer' ? <BestModal
+        open
         title={
           drawer.mode === 'detail'
             ? `${schema.title}详情`
@@ -537,17 +641,12 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
               ? `编辑${schema.title}`
               : `新建${schema.title}`
         }
-        onClose={() => setDrawer({ mode: 'closed' })}
+        width={schema.detail?.width}
+        footer={drawer.mode === 'detail' && schema.detail?.footer?.length ? <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>{schema.detail.footer.map((action) => <ActionButton action={action} key={action.id} record={drawer.record} onExecute={handleAction} />)}</div> : undefined}
+        onClose={() => { detailRequestRef.current?.abort(); setDrawer({ mode: 'closed' }); setDetailState({ loading: false }) }}
       >
         {drawer.mode === 'detail' ? (
-          <BestDetail
-            fields={
-              schema.detail?.fields.map((field) =>
-                toDetailField(field, registry.dictionaries, registry.slots)
-              ) ?? []
-            }
-            record={drawer.record}
-          />
+          <DetailContent state={detailState} record={drawer.record} />
         ) : null}
         {drawer.mode === 'edit' || drawer.mode === 'create' ? (
           <BestForm
@@ -561,9 +660,23 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
             }}
           />
         ) : null}
-      </BestModal>
+      </BestModal> : null}
     </>
   )
+
+  function DetailContent({ state, record }: { state: DetailState; record?: RecordValue }) {
+    if (state.loading) return <BestLoading />
+    if (state.error) return <BestError description={errorMessage(state.error, `${schema.title}详情加载失败`)} />
+    if (!record) return <BestEmpty />
+    const sections = schema.detail?.sections?.map((section) => toDetailSection(section, record, registry.dictionaries, registry.slots)).filter(Boolean) as BestDetailSection[] | undefined
+    return <BestDetail
+      fields={schema.detail?.fields?.map((field) => toDetailField(field, registry.dictionaries, registry.slots, record)) ?? []}
+      sections={sections}
+      sectionColumns={schema.detail?.columns}
+      sectionGap={schema.detail?.gap}
+      record={record}
+    />
+  }
 
   function ActionButton({
     action,

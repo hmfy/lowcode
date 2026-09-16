@@ -61,6 +61,49 @@ export type DetailFieldSchema = {
   dict?: string
   span?: number
   slot?: string
+  format?: DetailFormat | DetailFormatConfig
+  visibleWhen?: Condition
+  emptyText?: string
+}
+
+export type DetailFormat = 'text' | 'number' | 'money' | 'date' | 'datetime' | 'boolean' | 'json'
+
+export type DetailFormatConfig = {
+  type: DetailFormat
+  emptyText?: string
+  precision?: number
+  timezone?: string
+}
+
+export type DetailTableColumnSchema = {
+  field: string
+  title: string
+  width?: number
+  fixed?: 'left' | 'right'
+  dict?: string
+  format?: DetailFormat | DetailFormatConfig
+  slot?: string
+}
+
+export type DetailTableSchema = {
+  data: string
+  rowKey?: string
+  columns: DetailTableColumnSchema[]
+  scrollX?: number | string
+}
+
+export type DetailSectionSchema = {
+  key: string
+  title?: string
+  description?: string
+  visibleWhen?: Condition
+  layout?: 'fields' | 'table' | 'slot'
+  columns?: number
+  span?: number
+  variant?: 'plain' | 'card'
+  fields?: DetailFieldSchema[]
+  table?: DetailTableSchema
+  slot?: string
 }
 
 export type PageActionButtonType = 'primary' | 'default' | 'link' | 'text' | 'dashed'
@@ -68,7 +111,7 @@ export type PageActionButtonType = 'primary' | 'default' | 'link' | 'text' | 'da
 export type PageActionSchema = {
   id: string
   label: string
-  effect: 'openCreate' | 'openDetail' | 'openEdit' | 'remove' | 'runAction' | 'slot'
+  effect: 'openCreate' | 'openDetail' | 'openEdit' | 'remove' | 'runAction' | 'slot' | 'closeDetail'
   action?: string
   slot?: string
   access?: string
@@ -100,7 +143,15 @@ export type CrudPageSchema = {
     scrollX?: number
     pageSize?: number
   }
-  detail?: { fields: DetailFieldSchema[] }
+  detail?: {
+    mode?: 'drawer' | 'modal' | 'inline'
+    width?: number | string
+    columns?: number
+    gap?: number | string
+    fields?: DetailFieldSchema[]
+    sections?: DetailSectionSchema[]
+    footer?: PageActionSchema[]
+  }
   toolbar?: PageActionSchema[]
   meta?: {
     generatedBy?: string

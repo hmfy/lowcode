@@ -39,9 +39,11 @@ const builtInEffects = new Set([
   'openEdit',
   'remove',
   'runAction',
-  'slot'
+  'slot',
+  'closeDetail'
 ])
 const columnFormats = new Set(['date', 'datetime', 'money', 'text'])
+const detailFormats = new Set(['text', 'number', 'money', 'date', 'datetime', 'boolean', 'json'])
 
 function push(diagnostics: SchemaDiagnostic[], path: string, code: string, message: string) {
   diagnostics.push({ path, code, message })
@@ -92,6 +94,20 @@ function validateCondition(condition: Condition, path: string, diagnostics: Sche
     return
   }
   push(diagnostics, path, 'condition.operator', `不支持的条件：${(condition as { operator?: unknown }).operator}`)
+}
+
+function validateDetailField(
+  field: import('./schema').DetailFieldSchema,
+  path: string,
+  registry: BestRegistry | undefined,
+  diagnostics: SchemaDiagnostic[]
+) {
+  if (field.visibleWhen) validateCondition(field.visibleWhen, `${path}/visibleWhen`, diagnostics)
+  if (field.slot && registry && !registry.slots[field.slot])
+    push(diagnostics, `${path}/slot`, 'registry.slot', `未注册插槽：${field.slot}`)
+  const format = typeof field.format === 'object' ? field.format.type : field.format
+  if (format && !detailFormats.has(format))
+    push(diagnostics, `${path}/format`, 'detail.format', `不支持的详情格式：${format}`)
 }
 
 function validateFields(
@@ -270,18 +286,28 @@ export function validateCrudPageSchema(
     if (
       !schema.detail ||
       typeof schema.detail !== 'object' ||
-      !Array.isArray(schema.detail.fields)
+      (schema.detail.fields !== undefined && !Array.isArray(schema.detail.fields)) ||
+      (schema.detail.sections !== undefined && !Array.isArray(schema.detail.sections))
     ) {
-      push(diagnostics, '/detail', 'detail.type', 'detail 必须包含 fields 对象数组')
+      push(diagnostics, '/detail', 'detail.type', 'detail 必须包含 fields 或 sections 数组')
     } else {
-      schema.detail.fields.forEach((field, index) => {
-        if (field.slot && registry && !registry.slots[field.slot])
-          push(
-            diagnostics,
-            `/detail/fields/${index}/slot`,
-            'registry.slot',
-            `未注册插槽：${field.slot}`
-          )
+      schema.detail.fields?.forEach((field, index) => validateDetailField(field, `/detail/fields/${index}`, registry, diagnostics))
+      schema.detail.sections?.forEach((section, index) => {
+        if (section.visibleWhen) validateCondition(section.visibleWhen, `/detail/sections/${index}/visibleWhen`, diagnostics)
+        if (!section.key) push(diagnostics, `/detail/sections/${index}/key`, 'detail.section.key', '详情区块必须指定 key')
+        if (section.span !== undefined && (!Number.isInteger(section.span) || section.span < 1))
+          push(diagnostics, `/detail/sections/${index}/span`, 'detail.section.span', '详情区块 span 必须是正整数')
+        if (section.columns !== undefined && (!Number.isInteger(section.columns) || section.columns < 1))
+          push(diagnostics, `/detail/sections/${index}/columns`, 'detail.section.columns', '详情字段 columns 必须是正整数')
+        if (section.layout === 'slot' && !section.slot)
+          push(diagnostics, `/detail/sections/${index}/slot`, 'detail.slot', 'slot 区块必须指定 slot')
+        if (section.layout === 'table' && !section.table)
+          push(diagnostics, `/detail/sections/${index}/table`, 'detail.table', 'table 区块必须指定 table')
+        if (section.table && typeof section.table.data !== 'string')
+          push(diagnostics, `/detail/sections/${index}/table/data`, 'detail.table.data', '详情表格 data 必须是字段路径')
+        if (section.slot && registry && !registry.slots[section.slot])
+          push(diagnostics, `/detail/sections/${index}/slot`, 'registry.slot', `未注册插槽：${section.slot}`)
+        section.fields?.forEach((field, fieldIndex) => validateDetailField(field, `/detail/sections/${index}/fields/${fieldIndex}`, registry, diagnostics))
       })
     }
   }
@@ -295,6 +321,13 @@ export function validateCrudPageSchema(
   validateActions(
     schema.toolbar,
     '/toolbar',
+    registry,
+    Boolean(schema.dataSource?.remove),
+    diagnostics
+  )
+  validateActions(
+    schema.detail?.footer,
+    '/detail/footer',
     registry,
     Boolean(schema.dataSource?.remove),
     diagnostics
