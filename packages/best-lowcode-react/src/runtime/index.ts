@@ -2,6 +2,7 @@ export type { BestListQuery, BestListResult, BestListService } from '../lowcode/
 export type {
   BestAction,
   BestActionContext,
+  BestDictionaryActions,
   BestDictionaryItem,
   BestProviderProps,
   BestRegistry,
@@ -17,6 +18,7 @@ export {
   useBestAccess,
   useBestAction,
   useBestDictionary,
+  useBestDictionaryActions,
   useBestListService,
   useBestRegistry,
   useBestService

@@ -1,7 +1,7 @@
 import type { ThemeConfig } from 'antd'
 import { ConfigProvider } from 'antd'
 import type { ReactNode } from 'react'
-import { createContext, useContext, useMemo } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import type { BestListService } from '../lowcode/list'
 
 export type BestDictionaryItem = { label: string; value: string | number; disabled?: boolean }
@@ -42,6 +42,10 @@ export type BestRegistryLayer = Partial<Omit<BestRegistry, 'access'>> & {
   access?: BestRegistry['access']
 }
 
+export type BestDictionaryActions = {
+  setDictionary: (key: string, items: BestDictionaryItem[]) => void
+}
+
 const emptyRegistry: BestRegistry = {
   listServices: {},
   services: {},
@@ -60,6 +64,7 @@ const defaultTheme: ThemeConfig = {
 }
 
 const BestRuntimeContext = createContext<BestRegistry>(emptyRegistry)
+const BestDictionaryActionsContext = createContext<BestDictionaryActions | null>(null)
 
 export function composeBestRegistry(...layers: BestRegistryLayer[]): BestRegistry {
   const result: BestRegistry = {
@@ -93,14 +98,26 @@ export function createBestRegistry(registry: BestProviderProps['registry'] = {})
 }
 
 export function BestProvider({ children, registry, theme }: BestProviderProps) {
-  const value = useMemo(() => createBestRegistry(registry), [registry])
+  const [dictionaryUpdates, setDictionaryUpdates] = useState<Record<string, BestDictionaryItem[]>>({})
+  const setDictionary = useCallback((key: string, items: BestDictionaryItem[]) => {
+    setDictionaryUpdates((current) => ({ ...current, [key]: items }))
+  }, [])
+  const value = useMemo(() => {
+    const next = createBestRegistry(registry)
+    Object.assign(next.dictionaries, dictionaryUpdates)
+    return next
+  }, [dictionaryUpdates, registry])
   const mergedTheme = useMemo<ThemeConfig>(
     () => ({ ...defaultTheme, ...theme, token: { ...defaultTheme.token, ...theme?.token } }),
     [theme]
   )
   return (
     <BestRuntimeContext.Provider value={value}>
-      <ConfigProvider theme={mergedTheme}>{children}</ConfigProvider>
+      <ConfigProvider theme={mergedTheme}>
+        <BestDictionaryActionsContext.Provider value={{ setDictionary }}>
+          {children}
+        </BestDictionaryActionsContext.Provider>
+      </ConfigProvider>
     </BestRuntimeContext.Provider>
   )
 }
@@ -127,6 +144,12 @@ export function useBestAccess(key?: string): boolean {
 export function useBestDictionary(key?: string): BestDictionaryItem[] {
   const dictionaries = useBestRegistry().dictionaries
   return key ? (dictionaries[key] ?? []) : []
+}
+
+export function useBestDictionaryActions(): BestDictionaryActions {
+  const actions = useContext(BestDictionaryActionsContext)
+  if (!actions) throw new Error('useBestDictionaryActions 必须在 BestProvider 内使用')
+  return actions
 }
 
 export function useBestAction(key: string): BestAction {

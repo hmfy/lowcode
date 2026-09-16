@@ -44,6 +44,29 @@ export function CustomerPage() {
 }
 ```
 
+## 异步字典更新
+
+字典可以在页面初始化后通过 `useBestDictionaryActions` 局部更新，不需要替换完整 Registry：
+
+```tsx
+import { useEffect } from 'react'
+import { useBestDictionaryActions } from 'best-lowcode-runtime'
+
+function LoadDictionaries() {
+  const { setDictionary } = useBestDictionaryActions()
+
+  useEffect(() => {
+    void fetch('/api/status-options')
+      .then((response) => response.json())
+      .then((items) => setDictionary('customer.status', items))
+  }, [setDictionary])
+
+  return null
+}
+```
+
+`setDictionary` 只更新指定字典，并触发使用该字典的字段、表格和详情重新渲染。
+
 ## 开发期校验入口
 
 ### 通用表单和数据能力
