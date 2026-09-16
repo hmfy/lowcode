@@ -15,6 +15,7 @@ import {
   toDateRangePickerValue
 } from './BestForm'
 import type { BestFieldDefinition } from './types'
+import './BestSearch.module.less'
 
 export type BestSearchProps = {
   fields: BestFieldDefinition[]
@@ -25,7 +26,7 @@ export type BestSearchProps = {
   extra?: ReactNode
   onChange?: (value: Record<string, unknown>) => void
   onSearch: (value: Record<string, unknown>) => void
-  onReset?: () => void
+  onReset?: (value: Record<string, unknown>) => void
 }
 
 type FieldControlProps = {
@@ -220,7 +221,7 @@ function BestSearchBody({
       layout='vertical'
       onFinish={(values) => onSearch(values as Record<string, unknown>)}
       onValuesChange={(_, values) => onChange?.(values as Record<string, unknown>)}
-      style={{ marginBottom: 16 }}
+      className='best-lowcode-search'
     >
       <Row gutter={16} align='bottom'>
         {fields
@@ -239,10 +240,10 @@ function BestSearchBody({
             </Button>
             <Button
               onClick={() => {
-                syncValues(form, {}, fields)
-                valueSignatureRef.current = JSON.stringify({})
-                onChange?.({})
-                onReset?.()
+                syncValues(form, initialValues, fields)
+                valueSignatureRef.current = JSON.stringify(initialValues)
+                onChange?.(initialValues)
+                onReset?.(initialValues)
               }}
               style={{ marginInlineStart: 8 }}
             >

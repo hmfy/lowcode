@@ -15,8 +15,8 @@ const spies = vi.hoisted(() => ({
 }))
 
 vi.mock('antd', () => ({
-  Button: ({ children, onClick }: { children: ReactNode; onClick: () => void }) => (
-    <button onClick={onClick} type='button'>
+  Button: ({ children, onClick, type: buttonType }: { children: ReactNode; onClick?: () => void; type?: string }) => (
+    <button onClick={onClick} data-button-type={buttonType} type='button'>
       {children}
     </button>
   ),
@@ -36,7 +36,7 @@ type TableColumn = {
 
 vi.mock('../src/ui', () => ({
   BestDetail: () => <div>详情</div>,
-  BestDrawer: ({ children, open }: { children: ReactNode; open: boolean }) =>
+  BestModal: ({ children, open }: { children: ReactNode; open: boolean }) =>
     open ? <div>{children}</div> : null,
   BestForm: ({
     initialValues,
@@ -49,10 +49,21 @@ vi.mock('../src/ui', () => ({
       提交表单
     </button>
   ),
-  BestSearch: ({ onSearch }: { onSearch: (value: Record<string, unknown>) => void }) => (
-    <button onClick={() => onSearch({ tag: 'retail' })} type='button'>
-      搜索
-    </button>
+  BestSearch: ({
+    onReset,
+    onSearch
+  }: {
+    onReset?: (value: Record<string, unknown>) => void
+    onSearch: (value: Record<string, unknown>) => void
+  }) => (
+    <>
+      <button onClick={() => onSearch({ tag: 'retail' })} type='button'>
+        搜索
+      </button>
+      <button onClick={() => onReset?.({ tag: 'default' })} type='button'>
+        重置搜索
+      </button>
+    </>
   ),
   BestTable: ({
     actionRef,
@@ -159,7 +170,23 @@ afterEach(() => {
 })
 
 describe('BestCrudPage', () => {
-  it('loads records, submits create and edit drawers, and reloads the table', async () => {
+  it('uses configured action button type and keeps link as the default', () => {
+    const pageSchema = {
+      ...schema,
+      toolbar: [{ id: 'create', label: '新增', effect: 'openCreate', buttonType: 'primary' as const }]
+    } satisfies CrudPageSchema
+    renderSchemaPage(pageSchema, {
+      listServices: { 'customer.list': vi.fn().mockResolvedValue({ items: [], total: 0 }) },
+      services: {
+        'customer.create': vi.fn(),
+        'customer.update': vi.fn(),
+        'customer.remove': vi.fn()
+      }
+    })
+    expect(screen.getByRole('button', { name: '新增' }).getAttribute('data-button-type')).toBe('primary')
+    expect(screen.getByRole('button', { name: '编辑' }).getAttribute('data-button-type')).toBe('link')
+  })
+  it('loads records, submits create and edit modals, and reloads the table', async () => {
     const list = vi.fn().mockResolvedValue({ items: [], total: 0 })
     const create = vi.fn().mockResolvedValue(undefined)
     const update = vi.fn().mockResolvedValue(undefined)
@@ -276,6 +303,36 @@ describe('BestCrudPage', () => {
     await waitFor(() =>
       expect(list).toHaveBeenLastCalledWith(
         expect.objectContaining({ filters: { tag: 'retail' } }),
+        expect.anything()
+      )
+    )
+  })
+
+  it('uses search defaults again after reset', async () => {
+    const list = vi.fn().mockResolvedValue({ items: [], total: 0 })
+    const pageSchema = {
+      ...schema,
+      searchMode: 'bestSearch' as const,
+      search: [
+        { field: 'tag', label: '标签', component: 'input' as const, defaultValue: 'default' }
+      ]
+    }
+    renderSchemaPage(pageSchema, {
+      listServices: { 'customer.list': list },
+      services: {
+        'customer.create': vi.fn(),
+        'customer.update': vi.fn(),
+        'customer.remove': vi.fn()
+      }
+    })
+
+    await waitFor(() => expect(list).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('button', { name: '搜索' }))
+    fireEvent.click(screen.getByRole('button', { name: '重置搜索' }))
+
+    await waitFor(() =>
+      expect(list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ filters: { tag: 'default' } }),
         expect.anything()
       )
     )

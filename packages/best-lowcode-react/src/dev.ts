@@ -1,1 +1,5 @@
-export { getBuiltinCapabilities, validateUnknownCrudPageSchema } from './lowcode/dev'
+export {
+  getBuiltinCapabilities,
+  validateUnknownCrudPageSchema,
+  validateUnknownPageSchema
+} from './lowcode/dev'

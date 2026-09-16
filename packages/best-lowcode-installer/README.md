@@ -1,6 +1,6 @@
 # BEST low-code installer
 
-Install the globally shared DevTools, explicit BEST low-code Skills, and user-level MCP entries
+Install the user-scoped DevTools, explicit BEST low-code Skills, and user-level MCP entries
 for Codex and Cursor:
 
 ```bash
@@ -9,6 +9,12 @@ npx -y best-lowcode-installer
 
 The installer prints line-based progress for DevTools installation, host detection, and each
 Skill/MCP configuration step, then prints the full JSON result for scripting.
+
+The installer uses `npm install --global --prefix ~/.best-lowcode` for every environment,
+including when Volta is installed. This does not require write access to npm's system-wide global
+directory. The installer validates the resolved executable before host
+configuration proceeds and registers MCP with its absolute path, so this directory does not need
+to be in `PATH`.
 
 The installer copies Skills to `~/.codex/skills` and `~/.cursor/skills`. It first prefers the
 native host CLI for MCP registration. If only the desktop client is detected, it uses a

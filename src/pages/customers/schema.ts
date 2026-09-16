@@ -48,7 +48,11 @@ export const customerSchema = {
       label: "介绍人",
       component: "remoteSelect",
       remoteService: "user.search",
-      visibleWhen: { operator: "equals", field: "source", value: "internal_referral" },
+      visibleWhen: {
+        operator: "equals",
+        field: "source",
+        value: "internal_referral"
+      },
       clearWhenHidden: true
     },
     {
@@ -56,14 +60,22 @@ export const customerSchema = {
       label: "介绍渠道",
       component: "select",
       dict: "channels",
-      visibleWhen: { operator: "equals", field: "source", value: "business_referral" },
+      visibleWhen: {
+        operator: "equals",
+        field: "source",
+        value: "business_referral"
+      },
       clearWhenHidden: true
     },
     {
       field: "sourceDescription",
       label: "来源描述",
       component: "input",
-      visibleWhen: { operator: "equals", field: "source", value: "self_registered" },
+      visibleWhen: {
+        operator: "equals",
+        field: "source",
+        value: "self_registered"
+      },
       clearWhenHidden: true
     },
     {
@@ -110,29 +122,51 @@ export const customerSchema = {
   table: {
     rowKey: "id",
     pageSize: 10,
-    scrollX: 1600,
+    scrollX: 2100,
     columns: [
-      { field: "id", title: "商户ID" },
-      { field: "name", title: "客户名称" },
-      { field: "email", title: "登录邮箱" },
-      { field: "status", title: "状态", dict: "status" },
-      { field: "authorized", title: "授权卡数" },
-      { field: "tag", title: "标签", dict: "tags" },
-      { field: "sourceText", title: "来源" },
-      { field: "currency", title: "币种" },
-      { field: "balance", title: "当前余额", format: "money" },
-      { field: "available", title: "预计可用额度", format: "money" },
-      { field: "createdAt", title: "创建时间", format: "datetime" }
+      { field: "id", title: "商户ID", width: 160 },
+      { field: "name", title: "客户名称", width: 200 },
+      { field: "email", title: "登录邮箱", width: 200 },
+      { field: "status", title: "状态", dict: "status", width: 90 },
+      { field: "authorized", title: "授权卡数", width: 100 },
+      { field: "tag", title: "标签", dict: "tags", width: 120 },
+      { field: "sourceText", title: "来源", width: 180 },
+      { field: "currency", title: "币种", width: 90 },
+      { field: "balance", title: "当前余额", format: "money", width: 140 },
+      {
+        field: "available",
+        title: "预计可用额度",
+        format: "money",
+        width: 170
+      },
+      { field: "createdAt", title: "创建时间", format: "datetime", width: 180 }
     ],
     actions: [
       { id: "edit", label: "编辑", effect: "openEdit" },
       { id: "detail", label: "查看", effect: "openDetail" },
-      { id: "toggle", label: "启用/禁用", effect: "runAction", action: "customer.toggleStatus" },
-      { id: "reset", label: "修改密码", effect: "runAction", action: "customer.resetPassword" },
+      {
+        id: "toggle",
+        label: "启用/禁用",
+        effect: "runAction",
+        action: "customer.toggleStatus"
+      },
+      {
+        id: "reset",
+        label: "修改密码",
+        effect: "runAction",
+        action: "customer.resetPassword"
+      },
       { id: "remove", label: "删除", effect: "remove" }
     ]
   },
-  toolbar: [{ id: "create", label: "添加客户", effect: "openCreate" }],
+  toolbar: [
+    {
+      id: "create",
+      label: "添加客户",
+      effect: "openCreate",
+      buttonType: "primary"
+    }
+  ],
   detail: {
     fields: [
       { field: "id", label: "商户ID" },

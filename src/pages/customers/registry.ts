@@ -12,7 +12,10 @@ import {
 } from "./adapter";
 import { TieredPricingSlot } from "./TieredPricingSlot";
 export const customerRegistry: Partial<BestRegistry> = {
-  slots: { "customer.tieredPricing": (context) => createElement(TieredPricingSlot, context as never) },
+  slots: {
+    "customer.tieredPricing": (context) =>
+      createElement(TieredPricingSlot, context as never)
+  },
   listServices: { "customer.list": listCustomers },
   services: {
     "customer.detail": detailCustomer,
@@ -21,7 +24,14 @@ export const customerRegistry: Partial<BestRegistry> = {
     "customer.remove": removeCustomer,
     "user.search": searchUsers
   },
-  actions: { "customer.toggleStatus": async (context) => { await toggleCustomer(context); }, "customer.resetPassword": async (context) => { await resetCustomerPassword(context); } },
+  actions: {
+    "customer.toggleStatus": async (context) => {
+      await toggleCustomer(context);
+    },
+    "customer.resetPassword": async (context) => {
+      await resetCustomerPassword(context);
+    }
+  },
   dictionaries: {
     status: [
       { label: "全部", value: "" },

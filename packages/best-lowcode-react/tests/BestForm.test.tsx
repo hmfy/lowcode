@@ -176,7 +176,11 @@ vi.mock('antd', async () => {
     }
   )
   return {
-    Button: ({ children }: { children: ReactNode }) => <button type='button'>{children}</button>,
+    Button: ({ children, onClick }: { children: ReactNode; onClick?: () => void }) => (
+      <button onClick={onClick} type='button'>
+        {children}
+      </button>
+    ),
     Col: ({ children }: { children: ReactNode }) => <div>{children}</div>,
     ConfigProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
     DatePicker,
@@ -457,6 +461,34 @@ describe('BestForm', () => {
         screen.getAllByRole('textbox').map((input) => (input as HTMLInputElement).value)
       ).toEqual(['wholesale', ''])
     )
+  })
+
+  it('restores BestSearch defaults on reset', async () => {
+    const onChange = vi.fn()
+    const onReset = vi.fn()
+    render(
+      <BestSearch
+        fields={[
+          { field: 'tag', label: '标签', component: 'input', defaultValue: 'retail' },
+          { field: 'keyword', label: '关键词', component: 'input' }
+        ]}
+        onChange={onChange}
+        onReset={onReset}
+        onSearch={() => undefined}
+      />
+    )
+
+    const [tag, keyword] = screen.getAllByRole('textbox') as HTMLInputElement[]
+    fireEvent.change(tag, { target: { value: 'wholesale' } })
+    fireEvent.change(keyword, { target: { value: 'coffee' } })
+    fireEvent.click(screen.getByRole('button', { name: '重置' }))
+
+    await waitFor(() => {
+      expect(tag.value).toBe('retail')
+      expect(keyword.value).toBe('')
+    })
+    expect(onChange).toHaveBeenLastCalledWith({ tag: 'retail' })
+    expect(onReset).toHaveBeenCalledWith({ tag: 'retail' })
   })
 
   it('restores the current remote select label when it is not in the first page', async () => {

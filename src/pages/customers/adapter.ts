@@ -4,7 +4,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     ...init,
     headers: {
       "content-type": "application/json",
-      ...init.headers
+      ...init.headers,
+      authorization: import.meta.env.VITE_ADMIN_TOKEN
     }
   });
   const b = (await r.json()) as { code: number; msg?: string; data: T };

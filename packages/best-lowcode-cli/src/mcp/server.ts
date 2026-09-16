@@ -46,7 +46,7 @@ export function createBestLowcodeMcpServer(rootDir: string | undefined, adapter?
     return createBestLowcodeMcpService(projectRoot, adapter)
   }
   const server = new Server(
-    { name: 'best-lowcode-devtools', version: '0.2.0' },
+    { name: 'best-lowcode-devtools', version: '0.2.1' },
     { capabilities: { tools: {} } }
   )
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -75,20 +75,6 @@ export function createBestLowcodeMcpServer(rootDir: string | undefined, adapter?
           type: 'object',
           properties: { projectRoot: { type: 'string', description: '当前项目根目录（绝对路径）' } },
           required: rootDir ? [] : ['projectRoot'],
-          additionalProperties: false
-        }
-      },
-      {
-        name: 'best_prepare_task',
-        description:
-          '从项目 Config、Manifest 和内置能力生成确定性的 AgentTask，不写入文件。仅在用户明确要求 BEST low-code 时使用。',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            projectRoot: { type: 'string', description: '当前项目根目录（绝对路径）' },
-            request: { type: 'string', description: '自然语言页面需求' }
-          },
-          required: rootDir ? ['request'] : ['projectRoot', 'request'],
           additionalProperties: false
         }
       },
@@ -185,12 +171,6 @@ export function createBestLowcodeMcpServer(rootDir: string | undefined, adapter?
       }
       case 'best_get_context':
         return textResult(await (await getService(args)).getContext())
-      case 'best_prepare_task': {
-        const taskRequest = stringArg(args, 'request')
-        return taskRequest
-          ? textResult(await (await getService(args)).prepareTask(taskRequest))
-          : textResult({ error: 'request 必须是字符串' })
-      }
       case 'best_validate_selection': {
         const taskRequest = stringArg(args, 'request')
         const relatedCapabilities = stringArrayArg(args, 'relatedCapabilities')

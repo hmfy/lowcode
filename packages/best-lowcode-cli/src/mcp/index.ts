@@ -20,7 +20,7 @@ export { previewCandidateChange } from './preview'
 export { scanTypeScriptSchemas } from './schema-scan'
 export { createBestLowcodeMcpServer, startBestLowcodeMcpServer } from './server'
 export { createBestLowcodeMcpService } from './service'
-export { describeCapabilities, prepareTask } from './task'
+export { buildAgentTask, describeCapabilities } from './task'
 export type {
   AgentTask,
   CandidateLanguage,

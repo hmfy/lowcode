@@ -1,0 +1,20 @@
+flowchart LR
+  subgraph DEV[开发期]
+    A[需求] --> B[开发者/AI Agent]
+    B --> C[Schema]
+    B --> D[Registry]
+    B --> E[Adapter]
+    F[DevTools CLI/MCP] --> G[Config/Manifest]
+    F -.校验/预览.-> C
+  end
+  subgraph RUN[运行期]
+    H[Schema] --> I[BestCrudPage]
+    I --> J[BestProvider Registry]
+    J --> K[Adapter]
+    K --> L[后端 API]
+    L --> M[items/total]
+    M --> I
+  end
+  C -.发布.-> H
+  D -.注册.-> J
+  E -.接口转换.-> K

@@ -12,7 +12,9 @@ export type StaticSchemaValue =
 
 const IDENTIFIERS: Record<string, StaticSchemaValue> = {
   CRUD_SCHEMA_ID: 'https://best.dev/schema/crud/v1',
-  CRUD_SCHEMA_VERSION: 1
+  CRUD_SCHEMA_VERSION: 1,
+  TABBED_PAGE_SCHEMA_ID: 'https://best.dev/schema/tabs/v1',
+  TABBED_PAGE_SCHEMA_VERSION: 1
 }
 
 function propertyName(name: ts.PropertyName): string | undefined {
@@ -33,39 +35,64 @@ function unwrap(node: ts.Expression): ts.Expression {
   return node
 }
 
-function evaluate(node: ts.Expression): StaticSchemaValue | undefined {
-  node = unwrap(node)
-  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text
-  if (ts.isNumericLiteral(node)) return Number(node.text)
-  if (node.kind === ts.SyntaxKind.TrueKeyword) return true
-  if (node.kind === ts.SyntaxKind.FalseKeyword) return false
-  if (node.kind === ts.SyntaxKind.NullKeyword) return null
-  if (ts.isIdentifier(node) && node.text in IDENTIFIERS) return IDENTIFIERS[node.text]
-  if (ts.isArrayLiteralExpression(node)) {
-    const values: StaticSchemaValue[] = []
-    for (const element of node.elements) {
-      if (ts.isSpreadElement(element)) return undefined
-      const value = evaluate(element)
-      if (value === undefined) return undefined
-      values.push(value)
+function collectStaticDeclarations(sourceFile: ts.SourceFile) {
+  const declarations = new Map<string, ts.Expression>()
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue
+    for (const declaration of statement.declarationList.declarations) {
+      if (ts.isIdentifier(declaration.name) && declaration.initializer) {
+        declarations.set(declaration.name.text, declaration.initializer)
+      }
     }
-    return values
   }
-  if (ts.isObjectLiteralExpression(node)) {
-    const value: Record<string, StaticSchemaValue> = {}
-    for (const property of node.properties) {
-      if (!ts.isPropertyAssignment(property)) return undefined
-      const name = propertyName(property.name)
-      const propertyValue = evaluate(property.initializer)
-      if (!name || propertyValue === undefined) return undefined
-      value[name] = propertyValue
-    }
-    return value
-  }
-  return undefined
+  return declarations
 }
 
-function looksLikeCrudSchema(node: ts.Expression) {
+function createStaticEvaluator(declarations: Map<string, ts.Expression>) {
+  const resolving = new Set<string>()
+  function evaluate(node: ts.Expression): StaticSchemaValue | undefined {
+    node = unwrap(node)
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text
+    if (ts.isNumericLiteral(node)) return Number(node.text)
+    if (node.kind === ts.SyntaxKind.TrueKeyword) return true
+    if (node.kind === ts.SyntaxKind.FalseKeyword) return false
+    if (node.kind === ts.SyntaxKind.NullKeyword) return null
+    if (ts.isIdentifier(node)) {
+      if (node.text in IDENTIFIERS) return IDENTIFIERS[node.text]
+      const declaration = declarations.get(node.text)
+      if (!declaration || resolving.has(node.text)) return undefined
+      resolving.add(node.text)
+      const value = evaluate(declaration)
+      resolving.delete(node.text)
+      return value
+    }
+    if (ts.isArrayLiteralExpression(node)) {
+      const values: StaticSchemaValue[] = []
+      for (const element of node.elements) {
+        if (ts.isSpreadElement(element)) return undefined
+        const value = evaluate(element)
+        if (value === undefined) return undefined
+        values.push(value)
+      }
+      return values
+    }
+    if (ts.isObjectLiteralExpression(node)) {
+      const value: Record<string, StaticSchemaValue> = {}
+      for (const property of node.properties) {
+        if (!ts.isPropertyAssignment(property)) return undefined
+        const name = propertyName(property.name)
+        const propertyValue = evaluate(property.initializer)
+        if (!name || propertyValue === undefined) return undefined
+        value[name] = propertyValue
+      }
+      return value
+    }
+    return undefined
+  }
+  return evaluate
+}
+
+function looksLikePageSchema(node: ts.Expression) {
   node = unwrap(node)
   return (
     ts.isObjectLiteralExpression(node) &&
@@ -75,7 +102,9 @@ function looksLikeCrudSchema(node: ts.Expression) {
       const initializer = unwrap(property.initializer)
       return (
         name === '$schema' ||
-        (name === 'kind' && ts.isStringLiteral(initializer) && initializer.text === 'crud')
+        (name === 'kind' &&
+          ts.isStringLiteral(initializer) &&
+          (initializer.text === 'crud' || initializer.text === 'tabs'))
       )
     })
   )
@@ -108,13 +137,12 @@ export function parseStaticCrudSchemas(content: string, fileName: string) {
   }
 
   const schemas: Array<Record<string, StaticSchemaValue>> = []
-  function visit(node: ts.Node) {
-    if (
-      ts.isVariableDeclaration(node) &&
-      node.initializer &&
-      looksLikeCrudSchema(node.initializer)
-    ) {
-      const value = evaluate(node.initializer)
+  const evaluate = createStaticEvaluator(collectStaticDeclarations(sourceFile))
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue
+    for (const declaration of statement.declarationList.declarations) {
+      if (!declaration.initializer || !looksLikePageSchema(declaration.initializer)) continue
+      const value = evaluate(declaration.initializer)
       if (!value || typeof value !== 'object' || Array.isArray(value)) {
         diagnostics.push(
           diagnostic(
@@ -128,8 +156,6 @@ export function parseStaticCrudSchemas(content: string, fileName: string) {
         schemas.push(value as Record<string, StaticSchemaValue>)
       }
     }
-    ts.forEachChild(node, visit)
   }
-  visit(sourceFile)
   return { schemas, diagnostics }
 }

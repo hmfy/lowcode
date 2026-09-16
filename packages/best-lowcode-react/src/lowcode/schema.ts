@@ -2,6 +2,8 @@ import type { BestFieldComponent, BestFieldRule } from '../ui/types'
 
 export const CRUD_SCHEMA_ID = 'https://best.dev/schema/crud/v1' as const
 export const CRUD_SCHEMA_VERSION = 1 as const
+export const TABBED_PAGE_SCHEMA_ID = 'https://best.dev/schema/tabs/v1' as const
+export const TABBED_PAGE_SCHEMA_VERSION = 1 as const
 
 export type Condition =
   | { operator: 'equals'; field: string; value: string | number | boolean | null }
@@ -48,6 +50,7 @@ export type TableColumnSchema = {
   title: string
   dict?: string
   width?: number
+  fixed?: 'left' | 'right'
   format?: 'date' | 'datetime' | 'money' | 'text'
   slot?: string
 }
@@ -60,6 +63,8 @@ export type DetailFieldSchema = {
   slot?: string
 }
 
+export type PageActionButtonType = 'primary' | 'default' | 'link' | 'text' | 'dashed'
+
 export type PageActionSchema = {
   id: string
   label: string
@@ -68,6 +73,8 @@ export type PageActionSchema = {
   slot?: string
   access?: string
   confirm?: string
+  /** Visual button style; omitted actions use the runtime area default. */
+  buttonType?: PageActionButtonType
 }
 
 export type CrudPageSchema = {
@@ -99,4 +106,26 @@ export type CrudPageSchema = {
     generatedBy?: string
     generatedAt?: string
   }
+}
+
+export type TabContentSchema =
+  | { type: 'crud'; schema: CrudPageSchema }
+  | { type: 'slot'; slot: string }
+
+export type TabSchema = {
+  key: string
+  label: string
+  access?: string
+  /** Defaults to true so inactive CRUD pages do not fetch until selected. */
+  destroyOnHidden?: boolean
+  content: TabContentSchema
+}
+
+/** A page composition schema with runtime-owned tab navigation. */
+export type TabbedPageSchema = {
+  $schema: typeof TABBED_PAGE_SCHEMA_ID
+  version: typeof TABBED_PAGE_SCHEMA_VERSION
+  id: string
+  kind: 'tabs'
+  tabs: TabSchema[]
 }

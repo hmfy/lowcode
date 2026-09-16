@@ -26,7 +26,7 @@ function usage(io: CliIo) {
       'Usage:',
       '  best init [--allowed-paths <json-array>] [--manifest-paths <json-array>] [--verification-commands <json-array>] [--write] [--cwd <path>]',
       '  best page create <name> [--kind crud] [--dir <path>] [--title <title>] [--capability-prefix <id>] [--write] [--cwd <path>]',
-      '  best prepare <request> [--cwd <path>]',
+      '  best get-context [--cwd <path>]',
       '  best validate-selection <request> --related-capabilities <json-array> --allowed-paths <json-array> [--cwd <path>]',
       '  best preview-change <target-path> --candidate-file <path> [--language auto|ts|json] [--cwd <path>]',
       '  best verify [--cwd <path>]',
@@ -207,6 +207,15 @@ export async function runCli(
   }
 
   const service = createBestLowcodeMcpService(cwd, bestLowcodeAdapter)
+  if (command === 'get-context') {
+    if (args.length) {
+      usage(io)
+      return 1
+    }
+    const result = await service.getContext()
+    json(io, { ok: !hasErrors(result.diagnostics), ...result })
+    return hasErrors(result.diagnostics) ? 1 : 0
+  }
   if (command === 'manifest') {
     const validArgs = args.every((arg) => ['sync', '--discover', '--write'].includes(arg))
     if (args[0] !== 'sync' || !args.includes('--discover') || !validArgs) {
@@ -214,20 +223,6 @@ export async function runCli(
       return 1
     }
     const result = await service.discoverManifest(args.includes('--write'))
-    json(io, { ok: !hasErrors(result.diagnostics), ...result })
-    return hasErrors(result.diagnostics) ? 1 : 0
-  }
-  if (command === 'prepare') {
-    if (args.includes('--semantic')) {
-      usage(io)
-      return 1
-    }
-    const request = args.join(' ').trim()
-    if (!request) {
-      usage(io)
-      return 1
-    }
-    const result = await service.prepareTask(request)
     json(io, { ok: !hasErrors(result.diagnostics), ...result })
     return hasErrors(result.diagnostics) ? 1 : 0
   }

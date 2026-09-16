@@ -52,12 +52,11 @@ describe('project config', () => {
     )
   })
 
-  it('exposes config recovery through best_prepare_task results', async () => {
+  it('exposes config recovery through best_get_context results', async () => {
     const root = await mkdtemp(join(tmpdir(), 'best-lowcode-missing-config-'))
     const service = createBestLowcodeMcpService(root)
 
-    await expect(service.prepareTask('新增客户管理页面')).resolves.toMatchObject({
-      task: undefined,
+    await expect(service.getContext()).resolves.toMatchObject({
       diagnostics: [
         {
           code: 'config.missing',
