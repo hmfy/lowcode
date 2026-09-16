@@ -41,10 +41,10 @@ export type BestDetailProps = {
 
 export function BestDetail({ fields, record = {}, column = 2, sections, sectionColumns, sectionGap = 20 }: BestDetailProps) {
   const content = sections?.length
-    ? <div style={{ display: 'grid', gridTemplateColumns: `repeat(${sectionColumns ?? 1}, minmax(0, 1fr))`, gap: sectionGap }}>
+    ? <div style={{ display: 'grid', minWidth: 0, maxWidth: '100%', width: '100%', boxSizing: 'border-box', gridTemplateColumns: `repeat(${sectionColumns ?? 1}, minmax(0, 1fr))`, gap: sectionGap }}>
         {sections.map((section) => {
           const card = section.variant === 'card'
-          return <section key={section.key} style={{ gridColumn: section.span ? `span ${section.span}` : undefined, marginBottom: 0, border: card ? '1px solid #f0f0f0' : undefined, borderRadius: card ? 6 : undefined, overflow: card ? 'hidden' : undefined, background: card ? '#fff' : undefined }}>
+          return <section key={section.key} style={{ minWidth: 0, maxWidth: '100%', gridColumn: section.span ? `span ${section.span}` : undefined, marginBottom: 0, border: card ? '1px solid #f0f0f0' : undefined, borderRadius: card ? 6 : undefined, overflow: card ? 'hidden' : undefined, background: card ? '#fff' : undefined }}>
             {section.title ? <div style={{ padding: card ? '8px 12px' : undefined, background: card ? '#fafafa' : undefined, borderBottom: card ? '1px solid #f0f0f0' : undefined }}><Typography.Title level={5} style={{ margin: 0 }}>{section.title}</Typography.Title></div> : null}
             <div style={{ padding: card ? 12 : undefined }}>
               {section.description ? <Typography.Paragraph type='secondary'>{section.description}</Typography.Paragraph> : null}
@@ -61,7 +61,7 @@ export function BestDetail({ fields, record = {}, column = 2, sections, sectionC
 
 function FieldDescriptions({ fields, record, column }: { fields: BestDetailField[]; record: Record<string, unknown>; column: number }) {
   const visibleFields = fields.filter((field) => field.visible !== false)
-  return <Descriptions bordered column={column} size='small'>
+  return <div style={{ minWidth: 0, maxWidth: '100%', width: '100%', overflowX: 'auto' }}><Descriptions bordered column={column} size='small' style={{ minWidth: 0 }}>
     {visibleFields.map((field) => {
       const value = getPathValue(record, field.field)
       const display = field.render
@@ -69,12 +69,12 @@ function FieldDescriptions({ fields, record, column }: { fields: BestDetailField
         : (field.valueEnum?.[String(value)] ?? formatValue(value, field.format, field.emptyText))
       return <Descriptions.Item key={field.field} label={field.label} span={field.span}>{display}</Descriptions.Item>
     })}
-  </Descriptions>
+  </Descriptions></div>
 }
 
 function DetailTable({ table }: { table: BestDetailTable }) {
   if (!table.data.length) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description='暂无数据' />
-  return <Table<Record<string, unknown>>
+  return <div style={{ minWidth: 0, maxWidth: '100%', width: '100%', overflowX: 'auto' }}><Table<Record<string, unknown>>
     size='small'
     bordered
     pagination={false}
@@ -82,7 +82,7 @@ function DetailTable({ table }: { table: BestDetailTable }) {
     dataSource={table.data}
     scroll={table.scrollX ? { x: table.scrollX } : undefined}
     columns={table.columns.map((column) => ({ ...column, dataIndex: column.dataIndex ?? column.key }))}
-  />
+  /></div>
 }
 
 function formatValue(value: unknown, format: BestDetailField['format'], emptyText = '-') {

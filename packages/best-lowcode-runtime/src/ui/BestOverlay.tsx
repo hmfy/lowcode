@@ -20,8 +20,19 @@ export function BestDrawer({ children, open, title, onClose, width, footer }: Ov
 
 export function BestModal({ children, open, title, onClose, width, footer }: OverlayProps) {
   return (
-    <Modal destroyOnHidden footer={footer ?? null} open={open} title={title} width={width} onCancel={onClose}>
-      {children}
+    <Modal
+      destroyOnHidden
+      footer={footer ?? null}
+      open={open}
+      title={title}
+      width={width}
+      onCancel={onClose}
+      styles={{
+        root: { minWidth: 0, maxWidth: '100%', boxSizing: 'border-box' },
+        body: { minWidth: 0, maxWidth: '100%', overflowX: 'hidden', boxSizing: 'border-box' }
+      }}
+    >
+      <div style={{ minWidth: 0, maxWidth: '100%', width: '100%', boxSizing: 'border-box' }}>{children}</div>
     </Modal>
   )
 }

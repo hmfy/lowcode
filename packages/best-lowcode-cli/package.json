@@ -1,6 +1,6 @@
 {
   "name": "best-lowcode-devtools",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "CLI and MCP server for controlled BEST low-code development.",
   "keywords": [
     "best",
