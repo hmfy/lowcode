@@ -158,6 +158,7 @@ describe('lowcode schema', () => {
   it('accepts mode conditions and validates repeatable field definitions', () => {
     const schema = {
       ...crudSchema({ list: 'customer.list' }),
+      table: { rowKey: 'id', columns: [{ field: 'id', title: 'ID' }], actions: [] },
       form: [
         {
           field: 'password',
@@ -310,6 +311,50 @@ describe('lowcode schema', () => {
       expect.arrayContaining([
         expect.objectContaining({ code: 'condition.empty', path: '/form/0/visibleWhen' }),
         expect.objectContaining({ code: 'detail.type', path: '/detail' })
+      ])
+    )
+  })
+
+  it('accepts section-based detail schemas and validates their extension points', () => {
+    const schema = {
+      ...crudSchema({ list: 'customer.list' }),
+      table: { rowKey: 'id', columns: [{ field: 'id', title: 'ID' }], actions: [] },
+      detail: {
+        mode: 'drawer',
+        sections: [
+          {
+            key: 'summary',
+            layout: 'fields',
+            fields: [{ field: 'amount', label: '金额', format: { type: 'number', precision: 2 } }]
+          },
+          {
+            key: 'items',
+            layout: 'table',
+            table: {
+              data: 'items',
+              columns: [{ field: 'name', title: '名称' }]
+            }
+          }
+        ]
+      }
+    } satisfies CrudPageSchema
+    expect(validateCrudPageSchema(schema)).toEqual({ valid: true, diagnostics: [] })
+  })
+
+  it('rejects malformed detail sections and unsupported detail formats', () => {
+    const schema = {
+      ...crudSchema({ list: 'customer.list' }),
+      detail: {
+        sections: [
+          { key: '', layout: 'slot' },
+          { key: 'bad-format', fields: [{ field: 'x', label: 'X', format: 'currency' }] }
+        ]
+      }
+    } as unknown as CrudPageSchema
+    expect(validateCrudPageSchema(schema).diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'detail.slot', path: '/detail/sections/0/slot' }),
+        expect.objectContaining({ code: 'detail.format', path: '/detail/sections/1/fields/0/format' })
       ])
     )
   })

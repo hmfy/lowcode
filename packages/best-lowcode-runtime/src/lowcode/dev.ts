@@ -20,6 +20,7 @@ const builtInCapabilities = [
   'builtin.effect.remove',
   'builtin.effect.runAction',
   'builtin.effect.slot',
+  'builtin.effect.closeDetail',
   'builtin.format.date',
   'builtin.format.datetime',
   'builtin.format.money',
