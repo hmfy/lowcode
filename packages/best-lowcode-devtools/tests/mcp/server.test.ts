@@ -15,7 +15,7 @@ async function connectServer() {
   await writeFile(join(root, 'manifest.json'), JSON.stringify({ version: 1 }))
   const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair()
   const server = createBestLowcodeMcpServer(root)
-  const client = new Client({ name: 'best-lowcode-cli-test', version: '1.0.0' })
+  const client = new Client({ name: 'best-lowcode-devtools-test', version: '1.0.0' })
   await server.connect(serverTransport)
   await client.connect(clientTransport)
   return { client, server }

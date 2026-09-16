@@ -27,7 +27,7 @@ describe('bestLowcodeAdapter', () => {
   })
 
   it('applies primary-package validation during candidate previews', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-cli-'))
+    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-devtools-'))
     await writeFile(
       join(root, 'best.lowcode.config.json'),
       JSON.stringify({ version: 1, allowedPaths: ['schemas'], manifestPaths: ['manifest.json'] })

@@ -18,14 +18,14 @@ function createIo() {
 
 describe('best CLI', () => {
   it('rejects the removed AGENTS.md initialization command', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-cli-'))
+    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-devtools-'))
     const { io, output } = createIo()
     await expect(runCli(['agent', 'init', '--cwd', root], io)).resolves.toBe(1)
     expect(output.join('')).toContain('Usage:')
   })
 
   it('previews and writes a user-confirmed project configuration', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-cli-'))
+    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-devtools-'))
     const preview = createIo()
     await expect(
       runCli(['init', '--allowed-paths', '["apps/rps/src/pages"]', '--cwd', root], preview.io)
@@ -49,7 +49,7 @@ describe('best CLI', () => {
   })
 
   it('rejects the removed semantic provider option', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-cli-'))
+    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-devtools-'))
     const { io, output } = createIo()
     await expect(
       runCli(['prepare', '新增页面', '--semantic', 'unknown', '--cwd', root], io)
@@ -58,7 +58,7 @@ describe('best CLI', () => {
   })
 
   it('previews a candidate file without writing the target file', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-cli-'))
+    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-devtools-'))
     const { installFixturePackage } = await import('./runtime-fixture')
     await installFixturePackage(root)
     await writeFile(
@@ -95,15 +95,15 @@ describe('best CLI', () => {
   })
 
   it('finds the workspace root when invoked from a filtered package directory', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-cli-'))
-    const packageDirectory = join(root, 'packages', 'best-lowcode-cli')
+    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-devtools-'))
+    const packageDirectory = join(root, 'packages', 'best-lowcode-devtools')
     await mkdir(packageDirectory, { recursive: true })
     await writeFile(join(root, 'pnpm-workspace.yaml'), 'packages: []\n')
     await expect(findDefaultProjectRoot(packageDirectory)).resolves.toBe(root)
   })
 
   it('prefers a nearest low-code config over a workspace root', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-cli-'))
+    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-devtools-'))
     const projectDirectory = join(root, 'apps', 'rps')
     await mkdir(join(projectDirectory, 'scripts'), { recursive: true })
     await writeFile(join(root, 'pnpm-workspace.yaml'), 'packages: []\n')

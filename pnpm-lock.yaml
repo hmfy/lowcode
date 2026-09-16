@@ -58,7 +58,7 @@ importers:
         specifier: ^4.0.18
         version: 4.1.11(@types/node@24.13.3)(jsdom@26.1.0)(vite@7.3.6(@types/node@24.13.3)(less@4.9.0)(tsx@4.23.13))
 
-  packages/best-lowcode-cli:
+  packages/best-lowcode-devtools:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.0.0
