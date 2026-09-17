@@ -12,15 +12,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 6789,
           proxy: {
-            '/api': {
-              target: proxyTarget,
-              changeOrigin: true,
-              secure: false,
-              configure: (proxy) => {
-                if (authorization) proxy.on('proxyReq', (request) => request.setHeader('authorization', authorization))
-                if (target && proxyTarget !== target) proxy.on('proxyReq', (request) => request.setHeader('host', new URL(target).host))
-              },
-            },
+
           },
         }
   }
