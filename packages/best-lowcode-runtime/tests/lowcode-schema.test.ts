@@ -134,6 +134,28 @@ describe('lowcode schema', () => {
     expect(result.valid).toBe(true)
   })
 
+  it('accepts composite table columns without a source field', () => {
+    const result = validateUnknownCrudPageSchema({
+      $schema: 'https://best.dev/schema/crud/v1',
+      version: 1,
+      id: 'test',
+      kind: 'crud',
+      title: '测试页',
+      dataSource: { list: 'test.list' },
+      table: {
+        rowKey: 'id',
+        columns: [{
+          title: '客户信息',
+          composite: {
+            layout: 'vertical',
+            items: [{ label: '客户ID', field: 'customerId' }]
+          }
+        }]
+      }
+    })
+    expect(result.valid).toBe(true)
+  })
+
   it('requires registered slots for custom form fields and detail fields', () => {
     const schema = {
       ...crudSchema({ list: 'customer.list', remove: 'customer.remove' }),

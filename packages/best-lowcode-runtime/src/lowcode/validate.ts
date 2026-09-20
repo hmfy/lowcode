@@ -249,6 +249,50 @@ export function validateCrudPageSchema(
   if (!schema.table?.columns?.length)
     push(diagnostics, '/table/columns', 'table.columns', '至少需要一列')
   schema.table?.columns?.forEach((column, index) => {
+    if (!column.field && !column.composite) {
+      push(
+        diagnostics,
+        `/table/columns/${index}`,
+        'column.field',
+        '普通列必须指定 field，组合列必须指定 composite'
+      )
+    }
+    if (column.composite) {
+      if (!column.composite.items?.length) {
+        push(
+          diagnostics,
+          `/table/columns/${index}/composite/items`,
+          'column.composite.items',
+          '组合列至少需要一个字段'
+        )
+      }
+      column.composite.items?.forEach((item, itemIndex) => {
+        if (!item.field) {
+          push(
+            diagnostics,
+            `/table/columns/${index}/composite/items/${itemIndex}/field`,
+            'column.composite.field',
+            '组合列字段不能为空'
+          )
+        }
+        if (item.format && !columnFormats.has(item.format)) {
+          push(
+            diagnostics,
+            `/table/columns/${index}/composite/items/${itemIndex}/format`,
+            'column.composite.format',
+            `不支持的格式：${item.format}`
+          )
+        }
+        if (item.dict && registry && !registry.dictionaries[item.dict]) {
+          push(
+            diagnostics,
+            `/table/columns/${index}/composite/items/${itemIndex}/dict`,
+            'registry.dictionary',
+            `未注册字典：${item.dict}`
+          )
+        }
+      })
+    }
     if (column.fixed !== undefined && column.fixed !== 'left' && column.fixed !== 'right') {
       push(
         diagnostics,

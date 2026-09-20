@@ -6,6 +6,8 @@ export { BestTabbedPage } from './BestTabbedPage'
 export type { BestListQuery, BestListResult, BestListService } from './list'
 export type {
   Condition,
+  CompositeColumnItemSchema,
+  CompositeColumnSchema,
   CrudPageSchema,
   DetailFieldSchema,
   DetailFormat,
@@ -18,6 +20,8 @@ export type {
   PageActionButtonType,
   PageActionSchema,
   TableColumnSchema,
+  TableExpandableSchema,
+  TableRowSelectionSchema,
   TabContentSchema,
   TabbedPageSchema,
   TabSchema

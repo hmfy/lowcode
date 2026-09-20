@@ -1,7 +1,7 @@
 import type { ActionType } from '@ant-design/pro-components'
 import { Button, Modal, message } from 'antd'
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Key } from 'react'
 import { useBestListService, useBestRegistry } from '../runtime'
 import {
   BestDetail,
@@ -230,6 +230,7 @@ function toTableColumn(
   slots: ReturnType<typeof useBestRegistry>['slots']
 ): BestTableColumn<RecordValue> {
   const slot = column.slot
+  const composite = column.composite
   const valueEnum = column.dict
     ? Object.fromEntries(
         (dictionary[column.dict] ?? []).map((item) => [String(item.value), { text: item.label }])
@@ -246,12 +247,26 @@ function toTableColumn(
       column.format && !slot && !column.dict
         ? (value) => formatCrudValue(value, column.format)
         : undefined,
-    render: slot
+    render: composite
+      ? (_value, record) => (
+          <div style={{ display: 'flex', flexDirection: composite.layout === 'horizontal' ? 'row' : 'column', gap: composite.gap ?? 2 }}>
+            {composite.items.map((item) => {
+              const rawValue = getPathValue(record, item.field)
+              const dictionaryItem = item.dict
+                ? (dictionary[item.dict] ?? []).find((candidate) => String(candidate.value) === String(rawValue))
+                : undefined
+              const value = dictionaryItem?.label ?? formatCrudValue(rawValue, item.format)
+              const content = rawValue == null || rawValue === '' ? item.emptyText ?? '-' : value
+              return <div key={item.field}>{item.label ? `${item.label}：${content}` : content}</div>
+            })}
+          </div>
+        )
+      : slot
       ? (_value, record) =>
           slots[slot]?.({
             field: column.field,
             record,
-            value: record[column.field]
+            value: column.field ? record[column.field] : undefined
           }) ?? '-'
       : undefined
   }
@@ -462,6 +477,7 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
     )
     const configuredColumns = schema.table.columns.map((column) => {
       const tableColumn = toTableColumn(column, registry.dictionaries, registry.slots)
+      if (!column.field) return tableColumn
       const searchColumn = searchColumns.get(column.field)
       if (!searchColumn) return tableColumn
       searchColumns.delete(column.field)
@@ -499,6 +515,7 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
     [listService, schema.title]
   )
   const rowKey = schema.table.rowKey
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
   const request = useCallback(
     (params: RecordValue, sort?: Record<string, unknown>) =>
       pageRequest.request(
@@ -506,6 +523,10 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
       ),
     [pageRequest, useBestSearch]
   )
+
+  useEffect(() => {
+    setSelectedRowKeys([])
+  }, [schema.id])
 
   useLayoutEffect(() => {
     const previous = queryStateRef.current
@@ -611,6 +632,19 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
             ? (record) => rowKey.map((field) => String(record[field] ?? '')).join('-')
             : rowKey
         }
+        expandable={schema.table.expandable ? {
+          childrenColumnName: schema.table.expandable.childrenField ?? 'children',
+          defaultExpandAllRows: schema.table.expandable.defaultExpandAllRows,
+          defaultExpandedRowKeys: schema.table.expandable.defaultExpandedRowKeys,
+          indentSize: schema.table.expandable.indentSize
+        } : undefined}
+        rowSelection={schema.table.rowSelection?.enabled ? {
+          type: schema.table.rowSelection.type ?? 'checkbox',
+          checkStrictly: schema.table.rowSelection.checkStrictly ?? true,
+          preserveSelectedRowKeys: schema.table.rowSelection.preserveSelectedRowKeys,
+          selectedRowKeys,
+          onChange: (keys) => setSelectedRowKeys(keys)
+        } : undefined}
         search={useBestSearch ? false : undefined}
         scroll={schema.table.scrollX ? { x: schema.table.scrollX } : undefined}
         toolBarRender={() =>
