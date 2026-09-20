@@ -45,14 +45,45 @@ export type FieldSchema = {
   maxItems?: number
 }
 
-export type TableColumnSchema = {
+export type CompositeColumnItemSchema = {
+  label?: string
   field: string
+  dict?: string
+  format?: 'date' | 'datetime' | 'money' | 'text'
+  emptyText?: string
+}
+
+export type CompositeColumnSchema = {
+  layout?: 'vertical' | 'horizontal'
+  gap?: number
+  items: CompositeColumnItemSchema[]
+}
+
+export type TableColumnSchema = {
+  field?: string
   title: string
   dict?: string
   width?: number
   fixed?: 'left' | 'right'
   format?: 'date' | 'datetime' | 'money' | 'text'
   slot?: string
+  composite?: CompositeColumnSchema
+}
+
+export type TableExpandableSchema = {
+  /** Nested row field name. Defaults to Ant Design Table's `children`. */
+  childrenField?: string
+  defaultExpandAllRows?: boolean
+  defaultExpandedRowKeys?: (string | number)[]
+  indentSize?: number
+}
+
+export type TableRowSelectionSchema = {
+  enabled?: boolean
+  type?: 'checkbox' | 'radio'
+  /** When false, selecting a parent also selects its descendants. */
+  checkStrictly?: boolean
+  preserveSelectedRowKeys?: boolean
 }
 
 export type DetailFieldSchema = {
@@ -142,6 +173,8 @@ export type CrudPageSchema = {
     actions?: PageActionSchema[]
     scrollX?: number
     pageSize?: number
+    expandable?: TableExpandableSchema
+    rowSelection?: TableRowSelectionSchema
   }
   detail?: {
     mode?: 'drawer' | 'modal' | 'inline'

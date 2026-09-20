@@ -44,6 +44,30 @@ export function CustomerPage() {
 }
 ```
 
+### 组合列
+
+表格列可以通过 `composite` 在 JSON Schema 中组合多个记录字段，无需编写 Slot：
+
+```ts
+table: {
+  rowKey: 'id',
+  columns: [{
+    title: '客户信息',
+    width: 220,
+    composite: {
+      layout: 'vertical',
+      items: [
+        { label: '客户ID', field: 'customerId' },
+        { label: '姓名', field: 'customerName', emptyText: '--' },
+        { label: '邮箱', field: 'customerEmail' }
+      ]
+    }
+  }]
+}
+```
+
+`composite.items` 支持 `label`、`dict`、`format` 和 `emptyText`；组合列也可以继续使用普通列的 `width` 和 `fixed` 配置。
+
 ## 异步字典更新
 
 字典可以在页面初始化后通过 `useBestDictionaryActions` 局部更新，不需要替换完整 Registry：

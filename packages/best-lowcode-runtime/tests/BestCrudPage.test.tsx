@@ -11,7 +11,11 @@ const spies = vi.hoisted(() => ({
   error: vi.fn(),
   reload: vi.fn(),
   success: vi.fn(),
-  request: undefined as undefined | ((params: Record<string, unknown>) => Promise<unknown>)
+  request: undefined as undefined | ((params: Record<string, unknown>) => Promise<unknown>),
+  tableProps: undefined as undefined | {
+    expandable?: { childrenColumnName?: string; defaultExpandAllRows?: boolean; indentSize?: number }
+    rowSelection?: { type?: string; checkStrictly?: boolean; selectedRowKeys?: unknown[]; onChange?: (keys: unknown[]) => void }
+  }
 }))
 
 vi.mock('antd', () => ({
@@ -69,14 +73,19 @@ vi.mock('../src/ui', () => ({
     actionRef,
     columns,
     request,
-    toolBarRender
+    toolBarRender,
+    expandable,
+    rowSelection
   }: {
     actionRef: { current?: { reload: () => void } }
     columns: TableColumn[]
     request: (params: Record<string, unknown>) => Promise<unknown>
     toolBarRender?: () => ReactNode[]
+    expandable?: { childrenColumnName?: string; defaultExpandAllRows?: boolean; indentSize?: number }
+    rowSelection?: { type?: string; checkStrictly?: boolean; selectedRowKeys?: unknown[]; onChange?: (keys: unknown[]) => void }
   }) => {
     spies.request = request
+    spies.tableProps = { expandable, rowSelection }
     useEffect(() => {
       actionRef.current = {
         reload: () => {
@@ -167,9 +176,77 @@ afterEach(() => {
   cleanup()
   vi.clearAllMocks()
   spies.request = undefined
+  spies.tableProps = undefined
 })
 
 describe('BestCrudPage', () => {
+  it('passes nested-row expansion and parent-child selection configuration to BestTable', async () => {
+    const pageSchema = {
+      ...schema,
+      table: {
+        ...schema.table,
+        expandable: { childrenField: 'items', defaultExpandAllRows: true, indentSize: 24 },
+        rowSelection: { enabled: true, type: 'checkbox' as const, checkStrictly: false }
+      }
+    } satisfies CrudPageSchema
+
+    renderSchemaPage(pageSchema, {
+      listServices: { 'customer.list': vi.fn().mockResolvedValue({ items: [], total: 0 }) },
+      services: {
+        'customer.create': vi.fn(),
+        'customer.update': vi.fn(),
+        'customer.remove': vi.fn()
+      }
+    })
+
+    await waitFor(() => expect(spies.tableProps?.expandable).toEqual({
+      childrenColumnName: 'items',
+      defaultExpandAllRows: true,
+      defaultExpandedRowKeys: undefined,
+      indentSize: 24
+    }))
+    expect(spies.tableProps?.rowSelection?.type).toBe('checkbox')
+    expect(spies.tableProps?.rowSelection?.checkStrictly).toBe(false)
+    expect(spies.tableProps?.rowSelection?.selectedRowKeys).toEqual([])
+
+    spies.tableProps?.rowSelection?.onChange?.(['parent', 'child'])
+    await waitFor(() => expect(spies.tableProps?.rowSelection?.selectedRowKeys).toEqual(['parent', 'child']))
+  })
+
+  it('renders a composite column from multiple record fields without a slot', async () => {
+    const pageSchema = {
+      ...schema,
+      table: {
+        ...schema.table,
+        columns: [{
+          title: '客户信息',
+          composite: {
+            items: [
+              { label: '客户ID', field: 'id' },
+              { label: '姓名', field: 'name', emptyText: '--' },
+              { label: '邮箱', field: 'email' }
+            ]
+          }
+        }]
+      }
+    } satisfies CrudPageSchema
+
+    renderSchemaPage(pageSchema, {
+      listServices: { 'customer.list': vi.fn().mockResolvedValue({ items: [], total: 0 }) },
+      services: {
+        'customer.create': vi.fn(),
+        'customer.update': vi.fn(),
+        'customer.remove': vi.fn()
+      }
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('客户ID：customer-1')).toBeTruthy()
+      expect(screen.getByText('姓名：旧名称')).toBeTruthy()
+      expect(screen.getByText('邮箱：-')).toBeTruthy()
+    })
+  })
+
   it('uses configured action button type and keeps link as the default', () => {
     const pageSchema = {
       ...schema,
