@@ -94,7 +94,8 @@ describe('best lowcode MCP server', () => {
         arguments: {
           request: 'best page create customer-list',
           relatedCapabilities: [],
-          allowedPaths: ['apps/demo']
+          allowedPaths: ['apps/demo'],
+          targetPageDir: 'apps/demo/src/pages/customer-list'
         }
       })
     )

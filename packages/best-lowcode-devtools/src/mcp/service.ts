@@ -9,7 +9,12 @@ import { syncManifestDiscovery } from './manifest-sync'
 import { previewCandidateChange } from './preview'
 import { checkProjectRuntime } from './runtime'
 import { scanTypeScriptSchemas } from './schema-scan'
-import { buildAgentTask, describeCapabilities } from './task'
+import {
+  buildAgentTask,
+  describeCapabilities,
+  isInfrastructureMaintenanceRequest,
+  isLowcodeOptOutRequest
+} from './task'
 import type {
   CandidateLanguage,
   Diagnostic,
@@ -46,6 +51,7 @@ export function createBestLowcodeMcpService(
   }
 
   function validateTaskSelection(
+    request: string,
     selection: TaskSelection,
     allowedPaths: string[],
     capabilityIds: string[],
@@ -70,6 +76,29 @@ export function createBestLowcodeMcpService(
         level: 'error',
         code: 'selection.path.disallowed',
         message: `存在不在 allowedPaths 白名单中的路径：${disallowedPaths.join(', ')}`
+      })
+    }
+    if (
+      selection.targetPageDir &&
+      (!isWithinAllowedPath(selection.targetPageDir, allowedPaths) ||
+        !isWithinAllowedPath(selection.targetPageDir, selection.allowedPaths))
+    ) {
+      diagnostics.push({
+        level: 'error',
+        code: 'selection.page.disallowed',
+        message: `目标 CRUD 页面目录不在 allowedPaths 白名单中：${selection.targetPageDir}`,
+        path: selection.targetPageDir
+      })
+    }
+    if (
+      !selection.targetPageDir &&
+      !isInfrastructureMaintenanceRequest(request) &&
+      !isLowcodeOptOutRequest(request)
+    ) {
+      diagnostics.push({
+        level: 'error',
+        code: 'selection.page.required',
+        message: 'CRUD 页面必须通过 targetPageDir 明确指定目标目录'
       })
     }
     return diagnostics
@@ -108,6 +137,7 @@ export function createBestLowcodeMcpService(
       const diagnostics = [
         ...context.diagnostics,
         ...validateTaskSelection(
+          request,
           selection,
           context.config.allowedPaths,
           capabilityIds,
@@ -121,7 +151,8 @@ export function createBestLowcodeMcpService(
           // Manifest is a separately controlled capability file, not a business write path.
           allowedPaths: [...new Set(selection.allowedPaths)].filter(
             (path) => !context.config?.manifestPaths.includes(path)
-          )
+          ),
+          targetPageDir: selection.targetPageDir
         }),
         diagnostics
       }

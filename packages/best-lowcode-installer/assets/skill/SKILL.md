@@ -43,9 +43,13 @@ is not evidence that an extension is required and never authorizes a handwritten
 4. Run a capability audit. Select the complete set of relevant capability IDs declared in the
    context and only target paths inside the returned allowlist; do not pass only the capabilities
    initially suggested by the request.
-5. Call `best_validate_selection(projectRoot, request, relatedCapabilities, allowedPaths)`. If MCP
-   is unavailable, run `<best-cli> validate-selection <request> --related-capabilities '<json-array>'
-   --allowed-paths '<json-array>'`. Stop and ask the user if this returns diagnostics or `questions`.
+5. Call `best_validate_selection(projectRoot, request, relatedCapabilities, allowedPaths, targetPageDir)`.
+   For CRUD work, `targetPageDir` must be the explicit CRUD page directory selected by the Agent and
+   must be inside `allowedPaths`; do not infer it from `request`, capability IDs, or directory naming
+   conventions. If it is missing, let the validator return `selection.page.required`.
+   If MCP is unavailable, run `<best-cli> validate-selection <request> --related-capabilities '<json-array>'
+   --allowed-paths '<json-array>' --target-page-dir '<path>'`. Stop and ask the user if this returns
+   diagnostics or `questions`.
 6. Before calling `best_preview_change`, write a Runtime coverage plan in the conversation. Include
    the Runtime owner for each page area and, for every non-native requirement, record the attempted
    Runtime capability, the corresponding Schema/API, the limitation, whether a Slot can satisfy it,

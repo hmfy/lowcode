@@ -107,6 +107,8 @@ export type RequirementCoverage = {
 export type TaskSelection = {
   relatedCapabilities: string[]
   allowedPaths: string[]
+  /** Explicit CRUD page directory selected by the Agent. */
+  targetPageDir?: string
 }
 
 export type CandidatePreview = {

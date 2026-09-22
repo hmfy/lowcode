@@ -16,7 +16,7 @@ All commands write structured JSON to stdout.
 ```bash
 best init [options]
 best get-context
-best validate-selection <request> --related-capabilities <json-array> --allowed-paths <json-array>
+best validate-selection <request> --related-capabilities <json-array> --allowed-paths <json-array> [--target-page-dir <path>]
 best preview-change <target-path> --candidate-file <path> [--language auto|ts|json]
 best verify
 best page create <name> --kind crud [--dir <pages-root>] [--title <title>] [--write]

@@ -27,7 +27,7 @@ function usage(io: CliIo) {
       '  best init [--allowed-paths <json-array>] [--manifest-paths <json-array>] [--verification-commands <json-array>] [--write] [--cwd <path>]',
       '  best page create <name> [--kind crud] [--dir <path>] [--title <title>] [--capability-prefix <id>] [--write] [--cwd <path>]',
       '  best get-context [--cwd <path>]',
-      '  best validate-selection <request> --related-capabilities <json-array> --allowed-paths <json-array> [--cwd <path>]',
+      '  best validate-selection <request> --related-capabilities <json-array> --allowed-paths <json-array> [--target-page-dir <path>] [--cwd <path>]',
       '  best preview-change <target-path> --candidate-file <path> [--language auto|ts|json] [--cwd <path>]',
       '  best verify [--cwd <path>]',
       '  best manifest sync --discover [--write] [--cwd <path>]',
@@ -96,21 +96,24 @@ function parseStringArray(value: string | undefined) {
 function parseValidateSelectionArgs(args: string[]) {
   const capabilitiesIndex = args.indexOf('--related-capabilities')
   const pathsIndex = args.indexOf('--allowed-paths')
+  const targetPageIndex = args.indexOf('--target-page-dir')
   if (capabilitiesIndex === -1 || pathsIndex === -1) return undefined
   const relatedCapabilities = parseStringArray(args[capabilitiesIndex + 1])
   const allowedPaths = parseStringArray(args[pathsIndex + 1])
+  const targetPageDir = targetPageIndex === -1 ? undefined : args[targetPageIndex + 1]
+  const excludedIndexes = new Set([
+    capabilitiesIndex,
+    capabilitiesIndex + 1,
+    pathsIndex,
+    pathsIndex + 1,
+    ...(targetPageIndex === -1 ? [] : [targetPageIndex, targetPageIndex + 1])
+  ])
   const request = args
-    .filter(
-      (_, index) =>
-        index !== capabilitiesIndex &&
-        index !== capabilitiesIndex + 1 &&
-        index !== pathsIndex &&
-        index !== pathsIndex + 1
-    )
+    .filter((_, index) => !excludedIndexes.has(index))
     .join(' ')
     .trim()
   if (!request || !relatedCapabilities || !allowedPaths) return undefined
-  return { request, relatedCapabilities, allowedPaths }
+  return { request, relatedCapabilities, allowedPaths, targetPageDir }
 }
 
 function parsePreviewChangeArgs(args: string[]) {
@@ -234,7 +237,8 @@ export async function runCli(
     }
     const result = await service.validateSelection(selection.request, {
       relatedCapabilities: selection.relatedCapabilities,
-      allowedPaths: selection.allowedPaths
+      allowedPaths: selection.allowedPaths,
+      targetPageDir: selection.targetPageDir
     })
     json(io, { ok: !hasErrors(result.diagnostics), ...result })
     return hasErrors(result.diagnostics) ? 1 : 0

@@ -46,7 +46,7 @@ export function createBestLowcodeMcpServer(rootDir: string | undefined, adapter?
     return createBestLowcodeMcpService(projectRoot, adapter)
   }
   const server = new Server(
-    { name: 'best-lowcode-devtools', version: '0.2.11' },
+    { name: 'best-lowcode-devtools', version: '0.2.12' },
     { capabilities: { tools: {} } }
   )
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -96,6 +96,10 @@ export function createBestLowcodeMcpServer(rootDir: string | undefined, adapter?
               type: 'array',
               items: { type: 'string' },
               description: '当前 Agent 计划修改的项目相对路径'
+            },
+            targetPageDir: {
+              type: 'string',
+              description: '当前 Agent 明确选择的 CRUD 页面目录；必须位于 allowedPaths 范围内'
             }
           },
           required: rootDir
@@ -175,11 +179,13 @@ export function createBestLowcodeMcpServer(rootDir: string | undefined, adapter?
         const taskRequest = stringArg(args, 'request')
         const relatedCapabilities = stringArrayArg(args, 'relatedCapabilities')
         const allowedPaths = stringArrayArg(args, 'allowedPaths')
+        const targetPageDir = stringArg(args, 'targetPageDir')
         return taskRequest && relatedCapabilities && allowedPaths
           ? textResult(
               await (await getService(args)).validateSelection(taskRequest, {
                 relatedCapabilities,
-                allowedPaths
+                allowedPaths,
+                targetPageDir
               })
             )
           : textResult({ error: 'request、relatedCapabilities 和 allowedPaths 必须有效' })

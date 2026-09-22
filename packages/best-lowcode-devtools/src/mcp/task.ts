@@ -20,10 +20,6 @@ export function describeCapabilities(contexts: CapabilityContext[], builtInCapab
   }))
 }
 
-function unique(values: string[]) {
-  return [...new Set(values)]
-}
-
 function capabilityGroups(relatedCapabilities: string[], contexts: CapabilityContext[]) {
   const services = new Set<string>()
   const dictionaries = new Set<string>()
@@ -47,24 +43,6 @@ function capabilityGroups(relatedCapabilities: string[], contexts: CapabilityCon
   }
 }
 
-function pageNameFromCapabilities(capabilities: string[]) {
-  const pageNames = unique(
-    capabilities
-      .filter((id) => !id.startsWith('builtin.'))
-      .map((id) => {
-        const parts = id.split('.')
-        return parts.length >= 3 ? parts.slice(1, -1).join('-') : undefined
-      })
-      .filter((value): value is string => Boolean(value))
-  )
-  return pageNames.length === 1 ? pageNames[0] : undefined
-}
-
-function pageNameFromCommand(request: string) {
-  const commandMatch = request.match(/\bbest\s+page\s+create\s+([a-z][a-z0-9-]*)\b/i)
-  return commandMatch?.[1]
-}
-
 function isCreatePageRequest(request: string) {
   const normalized = request.toLocaleLowerCase()
   return (
@@ -75,7 +53,7 @@ function isCreatePageRequest(request: string) {
   )
 }
 
-function isInfrastructureMaintenanceRequest(request: string) {
+export function isInfrastructureMaintenanceRequest(request: string) {
   const normalized = request.toLocaleLowerCase()
   return (
     normalized.includes('基础设施') ||
@@ -86,7 +64,7 @@ function isInfrastructureMaintenanceRequest(request: string) {
   )
 }
 
-function isLowcodeOptOutRequest(request: string) {
+export function isLowcodeOptOutRequest(request: string) {
   const normalized = request.toLocaleLowerCase()
   return (
     normalized.includes('不用低代码') ||
@@ -103,21 +81,6 @@ function schemaFileName(pattern?: string) {
   if (!pattern || pattern.includes('*')) return 'schema.ts'
   const name = posix.basename(pattern)
   return name.endsWith('.ts') ? name : 'schema.ts'
-}
-
-function inferPageRoot(paths: string[]) {
-  const exactPage = paths.find((path) => /(^|\/)src\/pages\/[^/]+$/.test(path))
-  if (exactPage) return posix.dirname(exactPage)
-  const pagesPath = paths.find((path) => path.endsWith('/src/pages') || path === 'src/pages')
-  if (pagesPath) return pagesPath
-  const srcPath = paths.find((path) => path === 'src' || path.endsWith('/src'))
-  if (srcPath) return posix.join(srcPath, 'pages')
-  const appPath = paths.find((path) => path.startsWith('apps/') || path === 'apps')
-  return appPath ? posix.join(appPath, 'src/pages') : (paths[0] ?? '')
-}
-
-function selectedPageDirectory(paths: string[]) {
-  return paths.find((path) => /(^|\/)src\/pages\/[^/]+$/.test(path))
 }
 
 function isWithinAllowedPath(targetPath: string, allowedPaths: string[]) {
@@ -332,16 +295,12 @@ function requirementCoverage(
 function buildPageContext(
   request: string,
   config: ProjectConfig,
-  relatedCapabilities: string[],
-  allowedPaths: string[]
+  allowedPaths: string[],
+  targetPageDir?: string
 ): { pageContext: AgentTask['pageContext']; blockedQuestion?: string } {
-  const selectedPageDir = selectedPageDirectory(allowedPaths)
-  const selectedPageName = selectedPageDir ? posix.basename(selectedPageDir) : undefined
-  const pageName =
-    selectedPageName ?? pageNameFromCommand(request) ?? pageNameFromCapabilities(relatedCapabilities)
   const recommendedTemplate = isCreatePageRequest(request) ? ('crud' as const) : undefined
   const manifestPath = config.manifestPaths.length === 1 ? config.manifestPaths[0] : undefined
-  if (!pageName) {
+  if (!targetPageDir) {
     return {
       pageContext: {
         manifestPath,
@@ -351,12 +310,9 @@ function buildPageContext(
       }
     }
   }
-  const selectedPageDirForTask =
-    selectedPageDir && pageName === selectedPageName ? selectedPageDir : undefined
-  const pageRoot = selectedPageDirForTask
-    ? posix.dirname(selectedPageDirForTask)
-    : inferPageRoot(allowedPaths.length ? allowedPaths : config.allowedPaths)
-  const pageDir = selectedPageDirForTask ?? posix.join(pageRoot, pageName)
+  const pageName = posix.basename(targetPageDir)
+  const pageDir = targetPageDir
+  const pageRoot = posix.dirname(pageDir)
   if (!isWithinAllowedPath(pageDir, allowedPaths)) {
     return {
       pageContext: {
@@ -366,7 +322,7 @@ function buildPageContext(
         generatedFiles: [],
         recommendedTemplate
       },
-      blockedQuestion: `推导出的页面目录 ${pageDir} 不在 AgentTask.allowedPaths 范围内，请确认 allowedPaths 或重新指定页面目录。`
+      blockedQuestion: `目标页面目录 ${pageDir} 不在 AgentTask.allowedPaths 范围内，请确认 allowedPaths。`
     }
   }
   const schemaPath = posix.join(pageDir, schemaFileName(config.schemaFilePattern))
@@ -421,9 +377,7 @@ export function buildAgentTask(
     .map(({ id }) => id)
   const questions: string[] = []
   const selectionAllowedPaths = selection?.allowedPaths ?? config.allowedPaths
-  const canScaffoldNewPage =
-    isCreatePageRequest(request) &&
-    Boolean(selectedPageDirectory(selectionAllowedPaths) ?? pageNameFromCommand(request))
+  const canScaffoldNewPage = isCreatePageRequest(request) && Boolean(selection?.targetPageDir)
   const hasValidatedSelection = selection !== undefined
   const selectedCapabilities = selection?.relatedCapabilities ?? fallbackCapabilities
   const relatedCapabilities = selectedCapabilities
@@ -453,8 +407,8 @@ export function buildAgentTask(
   const pageContextResult = buildPageContext(
     request,
     config,
-    relatedCapabilities,
-    selectionAllowedPaths
+    selectionAllowedPaths,
+    selection?.targetPageDir
   )
   if (pageContextResult.blockedQuestion) questions.push(pageContextResult.blockedQuestion)
   if (
@@ -465,7 +419,7 @@ export function buildAgentTask(
     !pageContextResult.pageContext.pageDir
   ) {
     questions.push(
-      '未能确定 BEST CRUD 页面的目录；请确认目标页面名称或提供现有能力 ID，低代码链路在此之前不能实施。'
+      '未能确定 BEST CRUD 页面的目录；请通过 targetPageDir 明确提供目标页面目录。'
     )
   }
   return {

@@ -20,7 +20,10 @@ Run a capability audit before validation. The audit must include every relevant 
 and classify each atomic requirement as `native-supported`, `slot-supported`,
 `extension-required`, or `runtime-not-supported`.
 
-Pass the complete capability set to `best_validate_selection`. Do not pass only the capabilities
+Pass the complete capability set and, for CRUD work, an explicit `targetPageDir` to
+`best_validate_selection`. The target page directory is a separate selection field, not something
+inferred from the request text, capability IDs, or a conventional `src/pages` layout. If it is
+missing, the validator must return `selection.page.required`. Do not pass only the capabilities
 initially suggested by the request.
 
 For every non-native requirement, produce a fallback record:

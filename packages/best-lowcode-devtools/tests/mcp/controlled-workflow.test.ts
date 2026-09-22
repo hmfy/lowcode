@@ -54,7 +54,8 @@ describe('controlled low-code workflow', () => {
 
     const prepared = await service.validateSelection('给客户账簿增加日期范围查询', {
       relatedCapabilities: ['rps.client-ledger.list', 'builtin.field.dateRange'],
-      allowedPaths: ['apps/rps/src/pages/client-ledger']
+      allowedPaths: ['apps/rps/src/pages/client-ledger'],
+      targetPageDir: 'apps/rps/src/pages/client-ledger'
     })
     expect(prepared.diagnostics).toEqual([])
     expect(prepared.task).toMatchObject({

@@ -57,6 +57,40 @@ describe('best CLI', () => {
     expect(output.join('')).toContain('Usage:')
   })
 
+  it('returns a structured diagnostic when a CRUD target directory is missing', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-devtools-'))
+    await writeFile(
+      join(root, 'best.lowcode.config.json'),
+      JSON.stringify({
+        version: 1,
+        allowedPaths: ['apps/cis/src/pages'],
+        manifestPaths: ['lowcode.manifest.json']
+      })
+    )
+    await writeFile(join(root, 'lowcode.manifest.json'), JSON.stringify({ version: 1 }))
+    const { io, output } = createIo()
+
+    await expect(
+      runCli(
+        [
+          'validate-selection',
+          '重构 transfer-order/list',
+          '--related-capabilities',
+          '[]',
+          '--allowed-paths',
+          '["apps/cis/src/pages"]',
+          '--cwd',
+          root
+        ],
+        io
+      )
+    ).resolves.toBe(1)
+
+    expect(JSON.parse(output[0] ?? '{}').diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'selection.page.required' })
+    )
+  })
+
   it('previews a candidate file without writing the target file', async () => {
     const root = await mkdtemp(join(tmpdir(), 'best-lowcode-devtools-'))
     const { installFixturePackage } = await import('./runtime-fixture')

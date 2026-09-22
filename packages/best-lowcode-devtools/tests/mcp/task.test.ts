@@ -15,7 +15,13 @@ describe('buildAgentTask', () => {
           manifestPath: 'apps/rps/lowcode.manifest.json',
           manifest: { version: 1, services: { 'rps.client-ledger.list': {} } }
         }
-      ]
+      ],
+      [],
+      {
+        relatedCapabilities: ['rps.client-ledger.list'],
+        allowedPaths: ['apps/rps/src/pages/client-ledger'],
+        targetPageDir: 'apps/rps/src/pages/client-ledger'
+      }
     )
     expect(task.relatedCapabilities).toEqual(['rps.client-ledger.list'])
     expect(task.capabilityGroups).toMatchObject({
@@ -79,11 +85,14 @@ describe('buildAgentTask', () => {
       },
       [],
       [],
-      { relatedCapabilities: [], allowedPaths: ['apps/demo/src/pages'] }
+      {
+        relatedCapabilities: [],
+        allowedPaths: ['apps/demo/src/pages']
+      }
     )
 
     expect(task.questions).toContain(
-      '未能确定 BEST CRUD 页面的目录；请确认目标页面名称或提供现有能力 ID，低代码链路在此之前不能实施。'
+      '未能确定 BEST CRUD 页面的目录；请通过 targetPageDir 明确提供目标页面目录。'
     )
   })
 
@@ -96,7 +105,13 @@ describe('buildAgentTask', () => {
         manifestPaths: ['apps/demo/lowcode.manifest.json'],
         verificationCommands: ['pnpm -C apps/demo exec tsc -b']
       },
-      []
+      [],
+      [],
+      {
+        relatedCapabilities: [],
+        allowedPaths: ['apps/demo/src/pages/customer-list'],
+        targetPageDir: 'apps/demo/src/pages/customer-list'
+      }
     )
     expect(task.pageContext).toMatchObject({
       pageName: 'customer-list',
@@ -217,7 +232,7 @@ describe('buildAgentTask', () => {
     )
   })
 
-  it('derives src/pages as the page root for the default src allowPath', () => {
+  it('does not derive a page directory from the default src allowPath', () => {
     const task = buildAgentTask(
       'best page create customer-list',
       {
@@ -225,9 +240,14 @@ describe('buildAgentTask', () => {
         allowedPaths: ['src'],
         manifestPaths: ['lowcode.manifest.json']
       },
-      []
+      [],
+      [],
+      { relatedCapabilities: [], allowedPaths: ['src'] }
     )
-    expect(task.pageContext.pageDir).toBe('src/pages/customer-list')
+    expect(task.pageContext.pageDir).toBeUndefined()
+    expect(task.questions).toContain(
+      '未能确定 BEST CRUD 页面的目录；请通过 targetPageDir 明确提供目标页面目录。'
+    )
   })
 
   it('does not infer page directories from prose before page or 页面', () => {
@@ -242,7 +262,8 @@ describe('buildAgentTask', () => {
       [],
       {
         relatedCapabilities: ['builtin.field.input', 'builtin.field.select'],
-        allowedPaths: ['apps/rps/src/pages/client-ledger']
+        allowedPaths: ['apps/rps/src/pages/client-ledger'],
+        targetPageDir: 'apps/rps/src/pages/client-ledger'
       }
     )
 
@@ -274,7 +295,7 @@ describe('buildAgentTask', () => {
     expect(task.allowedPaths).toEqual(['packages/best-lowcode-runtime', 'packages/best-lowcode-devtools'])
   })
 
-  it('locates an existing page from a human-readable Manifest service description', () => {
+  it('does not locate an existing page from a Manifest service description', () => {
     const task = buildAgentTask(
       '调整客户管理功能',
       {
@@ -290,10 +311,17 @@ describe('buildAgentTask', () => {
             services: { 'rps.client-management.list': { description: '查询客户管理分页数据' } }
           }
         }
-      ]
+      ],
+      [],
+      {
+        relatedCapabilities: ['rps.client-management.list'],
+        allowedPaths: ['apps/rps/src/pages'],
+      }
     )
-    expect(task.pageContext.pageDir).toBe('apps/rps/src/pages/client-management')
-    expect(task.questions).toEqual([])
+    expect(task.pageContext.pageDir).toBeUndefined()
+    expect(task.questions).toContain(
+      '未能确定 BEST CRUD 页面的目录；请通过 targetPageDir 明确提供目标页面目录。'
+    )
   })
 
   it('reports mode, adapter and repeatable-group requirements as supported runtime capabilities', () => {
