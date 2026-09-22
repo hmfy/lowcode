@@ -44,6 +44,7 @@ export function BestTable<
   columns,
   cardProps,
   className,
+  options = false,
   search,
   emptyText = '暂无数据',
   ...props
@@ -53,7 +54,7 @@ export function BestTable<
       {...props}
       className={['best-lowcode-table', className].filter(Boolean).join(' ')}
       columns={columns as ProTableProps<DataSource, Params, ValueType>['columns']}
-      options={false}
+      options={options}
       search={mergeSearch(defaultSearch, search as typeof defaultSearch | false | undefined)}
       cardProps={
         cardProps === false
