@@ -181,6 +181,10 @@ function validateActions(
       push(diagnostics, actionPath, 'action.removeService', 'remove 动作必须配置 dataSource.remove')
     if (action.effect === 'slot' && !action.slot)
       push(diagnostics, actionPath, 'action.slot', 'slot 动作必须指定 slot key')
+    if (action.visibleWhen)
+      validateCondition(action.visibleWhen, `${actionPath}/visibleWhen`, diagnostics)
+    if (action.disabledWhen)
+      validateCondition(action.disabledWhen, `${actionPath}/disabledWhen`, diagnostics)
     if (action.action && registry && !registry.actions[action.action]) {
       push(diagnostics, actionPath, 'registry.action', `未注册动作：${action.action}`)
     }

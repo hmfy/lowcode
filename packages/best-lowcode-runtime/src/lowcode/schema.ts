@@ -73,6 +73,10 @@ export type TableColumnSchema = {
 export type TableExpandableSchema = {
   /** Nested row field name. Defaults to Ant Design Table's `children`. */
   childrenField?: string
+  /** Render a separate detail table from this field instead of nested rows. */
+  dataField?: string
+  rowKey?: string
+  columns?: TableColumnSchema[]
   defaultExpandAllRows?: boolean
   defaultExpandedRowKeys?: (string | number)[]
   indentSize?: number
@@ -84,6 +88,19 @@ export type TableRowSelectionSchema = {
   /** When false, selecting a parent also selects its descendants. */
   checkStrictly?: boolean
   preserveSelectedRowKeys?: boolean
+}
+
+export type TableStatusTabSchema = {
+  key: string
+  label: string
+  value?: string | number | boolean | null
+  count?: number
+}
+
+export type TableToolbarSchema = {
+  refresh?: boolean
+  columnSettings?: boolean
+  exportAction?: PageActionSchema
 }
 
 export type DetailFieldSchema = {
@@ -147,6 +164,8 @@ export type PageActionSchema = {
   slot?: string
   access?: string
   confirm?: string
+  visibleWhen?: Condition
+  disabledWhen?: Condition
   /** Visual button style; omitted actions use the runtime area default. */
   buttonType?: PageActionButtonType
 }
@@ -175,6 +194,18 @@ export type CrudPageSchema = {
     pageSize?: number
     expandable?: TableExpandableSchema
     rowSelection?: TableRowSelectionSchema
+    statusTabs?: {
+      field: string
+      items: TableStatusTabSchema[]
+      defaultKey?: string
+    }
+    toolbar?: TableToolbarSchema
+  }
+  searchConfig?: {
+    collapsible?: boolean
+    defaultCollapsed?: boolean
+    collapseAfter?: number
+    columns?: number
   }
   detail?: {
     mode?: 'drawer' | 'modal' | 'inline'

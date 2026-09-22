@@ -17,7 +17,12 @@ export type BestSlotContext = {
   value?: unknown
   values?: Record<string, unknown>
 }
-export type BestActionContext = BestSlotContext
+export type BestActionContext = BestSlotContext & {
+  selectedRowKeys?: Array<string | number>
+  selectedRecords?: Record<string, unknown>[]
+  query?: Record<string, unknown>
+  activeTab?: string
+}
 export type BestAction = (context: BestActionContext) => void | Promise<void>
 export type BestSlot = (context: BestSlotContext) => ReactNode
 export type BestSlotRegistry = Record<string, BestSlot>

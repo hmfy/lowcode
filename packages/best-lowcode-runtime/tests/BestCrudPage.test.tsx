@@ -12,9 +12,10 @@ const spies = vi.hoisted(() => ({
   reload: vi.fn(),
   success: vi.fn(),
   request: undefined as undefined | ((params: Record<string, unknown>) => Promise<unknown>),
+  actionContext: undefined as undefined | Record<string, unknown>,
   tableProps: undefined as undefined | {
-    expandable?: { childrenColumnName?: string; defaultExpandAllRows?: boolean; indentSize?: number }
-    rowSelection?: { type?: string; checkStrictly?: boolean; selectedRowKeys?: unknown[]; onChange?: (keys: unknown[]) => void }
+    expandable?: { childrenColumnName?: string; defaultExpandAllRows?: boolean; indentSize?: number; expandedRowRender?: (record: Record<string, unknown>) => ReactNode }
+    rowSelection?: { type?: string; checkStrictly?: boolean; selectedRowKeys?: unknown[]; onChange?: (keys: unknown[], rows?: Record<string, unknown>[]) => void }
   }
 }))
 
@@ -81,8 +82,8 @@ vi.mock('../src/ui', () => ({
     columns: TableColumn[]
     request: (params: Record<string, unknown>) => Promise<unknown>
     toolBarRender?: () => ReactNode[]
-    expandable?: { childrenColumnName?: string; defaultExpandAllRows?: boolean; indentSize?: number }
-    rowSelection?: { type?: string; checkStrictly?: boolean; selectedRowKeys?: unknown[]; onChange?: (keys: unknown[]) => void }
+    expandable?: { childrenColumnName?: string; defaultExpandAllRows?: boolean; indentSize?: number; expandedRowRender?: (record: Record<string, unknown>) => ReactNode }
+    rowSelection?: { type?: string; checkStrictly?: boolean; selectedRowKeys?: unknown[]; onChange?: (keys: unknown[], rows?: Record<string, unknown>[]) => void }
   }) => {
     spies.request = request
     spies.tableProps = { expandable, rowSelection }
@@ -176,6 +177,7 @@ afterEach(() => {
   cleanup()
   vi.clearAllMocks()
   spies.request = undefined
+  spies.actionContext = undefined
   spies.tableProps = undefined
 })
 
@@ -211,6 +213,80 @@ describe('BestCrudPage', () => {
 
     spies.tableProps?.rowSelection?.onChange?.(['parent', 'child'])
     await waitFor(() => expect(spies.tableProps?.rowSelection?.selectedRowKeys).toEqual(['parent', 'child']))
+  })
+
+  it('passes status tabs and selected rows to actions', async () => {
+    const list = vi.fn().mockResolvedValue({ items: [{ id: 'customer-1', status: 'created' }], total: 1 })
+    const action = vi.fn((context) => {
+      spies.actionContext = context as Record<string, unknown>
+    })
+    const pageSchema = {
+      ...schema,
+      table: {
+        ...schema.table,
+        statusTabs: {
+          field: 'status',
+          items: [
+            { key: 'all', label: '全部' },
+            { key: 'created', label: '已创建' }
+          ],
+          defaultKey: 'created'
+        },
+        rowSelection: { enabled: true },
+        toolbar: { refresh: true }
+      },
+      toolbar: [{ id: 'batch', label: '批量操作', effect: 'runAction' as const, action: 'batch' }]
+    } satisfies CrudPageSchema
+
+    renderSchemaPage(pageSchema, {
+      listServices: { 'customer.list': list },
+      services: {
+        'customer.create': vi.fn(),
+        'customer.update': vi.fn(),
+        'customer.remove': vi.fn()
+      },
+      actions: { batch: action }
+    })
+
+    await waitFor(() => expect(list).toHaveBeenCalled())
+    expect(list.mock.calls[0][0].filters).toMatchObject({ status: 'created' })
+    spies.tableProps?.rowSelection?.onChange?.(['customer-1'], [{ id: 'customer-1', status: 'created' }])
+    fireEvent.click(screen.getByRole('button', { name: '批量操作' }))
+    await waitFor(() => expect(action).toHaveBeenCalled())
+    expect(spies.actionContext).toMatchObject({
+      selectedRowKeys: ['customer-1'],
+      selectedRecords: [{ id: 'customer-1', status: 'created' }],
+      activeTab: 'created'
+    })
+  })
+
+  it('renders a separate expandable detail table from the configured data field', async () => {
+    const pageSchema = {
+      ...schema,
+      table: {
+        ...schema.table,
+        expandable: {
+          dataField: 'detailList',
+          rowKey: 'skuCode',
+          columns: [{ field: 'skuCode', title: 'SKU编码' }]
+        }
+      }
+    } satisfies CrudPageSchema
+
+    renderSchemaPage(pageSchema, {
+      listServices: { 'customer.list': vi.fn().mockResolvedValue({ items: [], total: 0 }) },
+      services: {
+        'customer.create': vi.fn(),
+        'customer.update': vi.fn(),
+        'customer.remove': vi.fn()
+      }
+    })
+
+    await waitFor(() => expect(spies.tableProps?.expandable?.expandedRowRender).toBeTypeOf('function'))
+    const expanded = spies.tableProps?.expandable?.expandedRowRender?.({
+      detailList: [{ skuCode: 'SKU-1' }]
+    })
+    expect(expanded).toBeTruthy()
   })
 
   it('renders a composite column from multiple record fields without a slot', async () => {

@@ -334,7 +334,13 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
     },
     [adapter, registeredListService]
   )
-  const searchFields = useFields(schema.search)
+  const rawSearchFields = useFields(schema.search)
+  const searchFields = useMemo(() => {
+    const columns = schema.searchConfig?.columns
+    if (!columns || columns < 1) return rawSearchFields
+    const span = Math.floor(24 / columns)
+    return rawSearchFields.map((field) => ({ ...field, span: field.span ?? span }))
+  }, [rawSearchFields, schema.searchConfig?.columns])
   const useBestSearch =
     schema.searchMode === 'bestSearch' ||
     schema.search?.some((field) => field.component === 'remoteSelect')
@@ -368,6 +374,28 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
   const detailRequestRef = useRef<AbortController | undefined>(undefined)
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
+  const defaultStatusTab = schema.table.statusTabs?.defaultKey ?? schema.table.statusTabs?.items[0]?.key
+  const [activeTab, setActiveTab] = useState(defaultStatusTab)
+  const activeTabRef = useRef(activeTab)
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
+  const selectedRowKeysRef = useRef<Key[]>([])
+  const selectedRecordsRef = useRef<Record<string, unknown>[]>([])
+  const rowKeyOf = useCallback(
+    (record: RecordValue) =>
+      Array.isArray(schema.table.rowKey)
+        ? schema.table.rowKey.map((field) => String(record[field] ?? '')).join('-')
+        : String(record[schema.table.rowKey] ?? ''),
+    [schema.table.rowKey]
+  )
+
+  useEffect(() => {
+    const nextTab = schema.table.statusTabs?.defaultKey ?? schema.table.statusTabs?.items[0]?.key
+    activeTabRef.current = nextTab
+    setActiveTab(nextTab)
+    setSelectedRowKeys([])
+    selectedRowKeysRef.current = []
+    selectedRecordsRef.current = []
+  }, [schema.id, schema.table.statusTabs])
 
   const handleAction = useCallback(
     async (action: PageActionSchema, record?: RecordValue) => {
@@ -457,7 +485,15 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
           return
         }
         try {
-          await runAction({ record })
+          await runAction({
+            record,
+            selectedRowKeys: selectedRowKeysRef.current.filter(
+              (key): key is string | number => typeof key === 'string' || typeof key === 'number'
+            ),
+            selectedRecords: selectedRecordsRef.current,
+            query: queryRef.current,
+            activeTab: activeTabRef.current
+          })
           actionRef.current?.reload()
         } catch (error) {
           message.error(errorMessage(error, `${action.label}失败，请稍后重试`))
@@ -515,18 +551,56 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
     [listService, schema.title]
   )
   const rowKey = schema.table.rowKey
-  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
   const request = useCallback(
     (params: RecordValue, sort?: Record<string, unknown>) =>
       pageRequest.request(
-        toBestListQuery({ ...params, ...(useBestSearch ? queryRef.current : {}) }, sort)
+        toBestListQuery(
+          {
+            ...params,
+            ...(useBestSearch ? queryRef.current : {}),
+            ...(schema.table.statusTabs && activeTabRef.current !== undefined
+              ? {
+                  [schema.table.statusTabs.field]:
+                    schema.table.statusTabs.items.find((item) => item.key === activeTabRef.current)?.value ??
+                    activeTabRef.current
+                }
+              : {})
+          },
+          sort
+        )
       ),
-    [pageRequest, useBestSearch]
+    [pageRequest, schema.table.statusTabs, useBestSearch]
   )
 
-  useEffect(() => {
-    setSelectedRowKeys([])
-  }, [schema.id])
+  const expandedColumns = useMemo(
+    () => schema.table.expandable?.columns?.map((column) =>
+      toTableColumn(column, registry.dictionaries, registry.slots)
+    ),
+    [registry.dictionaries, registry.slots, schema.table.expandable?.columns]
+  )
+
+  const handleSelectionChange = useCallback(
+    (keys: Key[], rows: RecordValue[] = []) => {
+      const records = new Map(selectedRecordsRef.current.map((record) => [rowKeyOf(record), record]))
+      rows.forEach((record) => records.set(rowKeyOf(record), record))
+      const keySet = new Set(keys.map((key) => String(key)))
+      const selectedRecords = Array.from(records.values()).filter((record) => keySet.has(rowKeyOf(record)))
+      selectedRecordsRef.current = selectedRecords
+      selectedRowKeysRef.current = keys
+      setSelectedRowKeys(keys)
+    },
+    [rowKeyOf]
+  )
+
+  const toolbarOptions = schema.table.toolbar
+  const statusTabs = schema.table.statusTabs
+  const proTableSearch = useMemo(() => {
+    if (useBestSearch || !schema.searchConfig?.collapsible) return undefined
+    return {
+      defaultCollapsed: schema.searchConfig.defaultCollapsed,
+      collapseRender: (collapsed: boolean) => (collapsed ? '展开' : '收起')
+    }
+  }, [schema.searchConfig, useBestSearch])
 
   useLayoutEffect(() => {
     const previous = queryStateRef.current
@@ -605,6 +679,9 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
           fields={searchFields}
           value={query}
           defaultValues={searchDefaultValues}
+          collapsible={schema.searchConfig?.collapsible}
+          defaultCollapsed={schema.searchConfig?.defaultCollapsed}
+          collapseAfter={schema.searchConfig?.collapseAfter}
           onReset={(values) => {
             queryRef.current = values
             queryStateRef.current = { ...queryStateRef.current, userTouched: true }
@@ -621,6 +698,26 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
           }}
         />
       ) : null}
+      {statusTabs ? (
+        <div role='tablist' style={{ display: 'flex', gap: 20, borderBottom: '1px solid #f0f0f0', marginBottom: 8 }}>
+          {statusTabs.items.map((tab) => {
+            const selected = activeTab === tab.key
+            return (
+              <Button
+                key={tab.key}
+                type={selected ? 'primary' : 'text'}
+                onClick={() => {
+                  activeTabRef.current = tab.key
+                  setActiveTab(tab.key)
+                  actionRef.current?.reload()
+                }}
+              >
+                {tab.label}{tab.count === undefined ? '' : ` (${tab.count})`}
+              </Button>
+            )
+          })}
+        </div>
+      ) : null}
       <BestTable<RecordValue, RecordValue>
         actionRef={actionRef}
         className={className}
@@ -636,22 +733,45 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
           childrenColumnName: schema.table.expandable.childrenField ?? 'children',
           defaultExpandAllRows: schema.table.expandable.defaultExpandAllRows,
           defaultExpandedRowKeys: schema.table.expandable.defaultExpandedRowKeys,
-          indentSize: schema.table.expandable.indentSize
+          indentSize: schema.table.expandable.indentSize,
+          expandedRowRender: schema.table.expandable.dataField && expandedColumns
+            ? (record) => {
+                const details = record[schema.table.expandable?.dataField ?? '']
+                return (
+                  <BestTable<RecordValue, RecordValue>
+                    columns={expandedColumns}
+                    dataSource={Array.isArray(details) ? details.filter(isRecord) : []}
+                    rowKey={schema.table.expandable?.rowKey ?? 'id'}
+                    pagination={false}
+                    search={false}
+                    options={false}
+                    cardProps={false}
+                  />
+                )
+              }
+            : undefined
         } : undefined}
         rowSelection={schema.table.rowSelection?.enabled ? {
           type: schema.table.rowSelection.type ?? 'checkbox',
           checkStrictly: schema.table.rowSelection.checkStrictly ?? true,
           preserveSelectedRowKeys: schema.table.rowSelection.preserveSelectedRowKeys,
           selectedRowKeys,
-          onChange: (keys) => setSelectedRowKeys(keys)
+          onChange: handleSelectionChange
         } : undefined}
-        search={useBestSearch ? false : undefined}
+        options={toolbarOptions?.columnSettings ? { setting: true, reload: false, density: false } : false}
+        search={useBestSearch ? false : proTableSearch}
         scroll={schema.table.scrollX ? { x: schema.table.scrollX } : undefined}
-        toolBarRender={() =>
-          schema.toolbar?.map((action) => (
+        toolBarRender={() => [
+          ...(schema.toolbar?.map((action) => (
             <ActionButton action={action} key={action.id} onExecute={handleAction} />
-          )) ?? []
-        }
+          )) ?? []),
+          ...(toolbarOptions?.refresh ? [
+            <Button key='refresh' onClick={() => actionRef.current?.reload()}>刷新</Button>
+          ] : []),
+          ...(toolbarOptions?.exportAction ? [
+            <ActionButton action={toolbarOptions.exportAction} key={toolbarOptions.exportAction.id} onExecute={handleAction} />
+          ] : [])
+        ]}
       />
       {drawer.mode === 'detail' && schema.detail?.mode === 'inline' ? (
         <DetailContent state={detailState} record={drawer.record} />
@@ -723,6 +843,9 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
   }) {
     const permitted = !action.access || registry.access(action.access)
     if (!permitted) return null
+    const visible = !action.visibleWhen || evaluateCondition(action.visibleWhen, record ?? {}, 'detail')
+    if (!visible) return null
+    const disabled = Boolean(action.disabledWhen && evaluateCondition(action.disabledWhen, record ?? {}, 'detail'))
     if (action.effect === 'slot' && action.slot) {
       return registry.slots[action.slot]?.({ record }) ?? null
     }
@@ -730,6 +853,7 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
       <Button
         key={action.id}
         type={action.buttonType ?? 'link'}
+        disabled={disabled}
         onClick={() => {
           void onExecute(action, record)
         }}

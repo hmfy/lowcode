@@ -2,7 +2,7 @@ import type { FormInstance } from 'antd'
 import { Button, Col, DatePicker, Form, Input, InputNumber, Row, Select } from 'antd'
 import dayjs from 'dayjs'
 import type { ReactNode } from 'react'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useBestRegistry } from '../runtime'
 import {
   getDefaultValues,
@@ -24,6 +24,9 @@ export type BestSearchProps = {
   loading?: boolean
   submitText?: string
   extra?: ReactNode
+  collapsible?: boolean
+  defaultCollapsed?: boolean
+  collapseAfter?: number
   onChange?: (value: Record<string, unknown>) => void
   onSearch: (value: Record<string, unknown>) => void
   onReset?: (value: Record<string, unknown>) => void
@@ -159,6 +162,9 @@ export function BestSearch({
   loading,
   submitText = '查询',
   extra,
+  collapsible = false,
+  defaultCollapsed = false,
+  collapseAfter = 4,
   onChange,
   onSearch,
   onReset
@@ -171,6 +177,9 @@ export function BestSearch({
     <BestSearchBody
       key={searchFormSignature(fields, initialValues)}
       extra={extra}
+      collapsible={collapsible}
+      collapseAfter={collapseAfter}
+      defaultCollapsed={defaultCollapsed}
       fields={fields}
       initialValues={initialValues}
       loading={loading}
@@ -190,11 +199,15 @@ function BestSearchBody({
   loading,
   submitText,
   extra,
+  collapsible,
+  defaultCollapsed,
+  collapseAfter = 4,
   onChange,
   onSearch,
   onReset
 }: Omit<BestSearchProps, 'defaultValues'> & { initialValues: Record<string, unknown> }) {
   const [form] = Form.useForm()
+  const [collapsed, setCollapsed] = useState(collapsible && defaultCollapsed)
   const valueSignatureRef = useRef<string | undefined>(undefined)
   const controlledRef = useRef(false)
 
@@ -226,6 +239,7 @@ function BestSearchBody({
       <Row gutter={16} align='bottom'>
         {fields
           .filter((field) => !field.hidden)
+          .filter((_, index) => !collapsed || index < collapseAfter)
           .map((field) => (
             <Col key={field.field} span={field.span ?? 6}>
               <Form.Item label={field.label} name={field.field} rules={toAntRules(field.rules)}>
@@ -250,6 +264,11 @@ function BestSearchBody({
               重置
             </Button>
             {extra}
+            {collapsible && fields.filter((field) => !field.hidden).length > collapseAfter ? (
+              <Button type='link' onClick={() => setCollapsed((value) => !value)}>
+                {collapsed ? '展开' : '收起'}
+              </Button>
+            ) : null}
           </Form.Item>
         </Col>
       </Row>

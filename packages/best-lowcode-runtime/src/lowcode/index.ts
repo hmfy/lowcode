@@ -22,6 +22,8 @@ export type {
   TableColumnSchema,
   TableExpandableSchema,
   TableRowSelectionSchema,
+  TableStatusTabSchema,
+  TableToolbarSchema,
   TabContentSchema,
   TabbedPageSchema,
   TabSchema
