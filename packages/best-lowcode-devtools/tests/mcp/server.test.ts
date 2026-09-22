@@ -48,6 +48,7 @@ describe('best lowcode MCP server', () => {
     expect(tools.tools.map((tool) => tool.name)).toEqual([
       'best_configure_project',
       'best_get_context',
+      'best_get_capabilities',
       'best_validate_selection',
       'best_preview_change',
       'best_discover_manifest',
@@ -82,6 +83,24 @@ describe('best lowcode MCP server', () => {
       await connection.client.callTool({ name: 'unknown_tool', arguments: {} })
     )
     expect(unknownTool).toEqual({ error: '不支持的工具：unknown_tool' })
+  })
+
+  it('returns the Runtime capability catalog without arguments', async () => {
+    const connection = await connectServer()
+    connections.push(connection)
+
+    const result = readText(
+      await connection.client.callTool({ name: 'best_get_capabilities', arguments: {} })
+    )
+
+    expect(result).toMatchObject({ runtime: 'best-lowcode-runtime', version: 1 })
+    expect(result.capabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'table.expandable', schemaPath: 'table.expandable' }),
+        expect.objectContaining({ key: 'table.rowSelection' }),
+        expect.objectContaining({ key: 'table.batchAction' })
+      ])
+    )
   })
 
   it('validates an Agent selection through the MCP transport', async () => {

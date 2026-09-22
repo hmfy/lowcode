@@ -36,16 +36,22 @@ describe('best-lowcode-installer', () => {
 
   it('uses the user directory even when VOLTA_HOME is set', async () => {
     const homeDir = await mkdtemp(join(tmpdir(), 'best-lowcode-installer-'))
+    await mkdir(join(homeDir, '.best-lowcode', 'lib', 'node_modules', DEVTOOLS_PACKAGE), { recursive: true })
+    await writeFile(
+      join(homeDir, '.best-lowcode', 'lib', 'node_modules', DEVTOOLS_PACKAGE, 'package.json'),
+      JSON.stringify({ version: '0.2.12' })
+    )
     const { runner, calls } = runnerWith(() => ({ ok: true, stdout: '', stderr: '' }))
     const result = await installBestLowcode({
       homeDir, runner, environment: { VOLTA_HOME: '/volta' }, platform: 'darwin',
       hostDetector: codexOnly, skillSourceDir: skillSource, devtoolsVersion: '0.2.0'
     })
     expect(result.ok).toBe(true)
+    expect(result.devtoolsVersion).toBe('0.2.12')
     expect(result.mcpCommand).toBe(join(userDevtoolsPrefix(homeDir), 'bin', 'best-lowcode-mcp'))
     expect(calls).toContainEqual([
       'npm',
-      ['install', '--global', '--prefix', userDevtoolsPrefix(homeDir), `${DEVTOOLS_PACKAGE}@0.2.0`]
+      ['install', '--global', '--prefix', userDevtoolsPrefix(homeDir), '--prefer-online', `${DEVTOOLS_PACKAGE}@0.2.0`]
     ])
     expect(calls).toContainEqual([join(userDevtoolsPrefix(homeDir), 'bin', 'best'), ['--help']])
     expect(calls.some(([command]) => command === 'volta')).toBe(false)
@@ -69,7 +75,7 @@ describe('best-lowcode-installer', () => {
     const result = await installBestLowcode({ homeDir, runner, environment: { VOLTA_HOME: '/volta' } })
     expect(result.ok).toBe(false)
     expect(calls).toEqual([
-      ['npm', ['install', '--global', '--prefix', userDevtoolsPrefix(homeDir), `${DEVTOOLS_PACKAGE}@latest`]]
+      ['npm', ['install', '--global', '--prefix', userDevtoolsPrefix(homeDir), '--prefer-online', `${DEVTOOLS_PACKAGE}@latest`]]
     ])
   })
   it('installs DevTools in the user directory, both host Skills, and missing MCP registrations through host CLIs', async () => {
@@ -92,7 +98,7 @@ describe('best-lowcode-installer', () => {
     })
     expect(calls).toContainEqual([
       'npm',
-      ['install', '--global', '--prefix', userDevtoolsPrefix(homeDir), `${DEVTOOLS_PACKAGE}@latest`]
+      ['install', '--global', '--prefix', userDevtoolsPrefix(homeDir), '--prefer-online', `${DEVTOOLS_PACKAGE}@latest`]
     ])
     expect(calls).toContainEqual([join(userDevtoolsPrefix(homeDir), 'bin', 'best'), ['--help']])
     expect(calls.some(([command, args]) => command === 'npm' && args[0] === 'prefix')).toBe(false)
@@ -378,7 +384,7 @@ describe('best-lowcode-installer', () => {
 
     expect(result).toMatchObject({ ok: false, devtools: 'failed', hosts: [] })
     expect(calls).toEqual([
-      ['npm', ['install', '--global', '--prefix', userDevtoolsPrefix(homeDir), `${DEVTOOLS_PACKAGE}@latest`]]
+      ['npm', ['install', '--global', '--prefix', userDevtoolsPrefix(homeDir), '--prefer-online', `${DEVTOOLS_PACKAGE}@latest`]]
     ])
   })
 })

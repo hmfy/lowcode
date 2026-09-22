@@ -12,29 +12,8 @@ import type {
 } from './schema'
 import type { SchemaDiagnostic, SchemaValidationResult } from './validate'
 import { validateCrudPageSchema, validateTabbedPageSchema } from './validate'
-
-const builtInCapabilities = [
-  'builtin.effect.openCreate',
-  'builtin.effect.openDetail',
-  'builtin.effect.openEdit',
-  'builtin.effect.remove',
-  'builtin.effect.runAction',
-  'builtin.effect.slot',
-  'builtin.effect.closeDetail',
-  'builtin.format.date',
-  'builtin.format.datetime',
-  'builtin.format.money',
-  'builtin.format.text',
-  'builtin.field.input',
-  'builtin.field.number',
-  'builtin.field.select',
-  'builtin.field.remoteSelect',
-  'builtin.field.date',
-  'builtin.field.dateRange',
-  'builtin.field.textarea',
-  'builtin.field.slot',
-  'builtin.field.repeatable'
-] as const
+import { getRuntimeCapabilityKeys, getRuntimeCapabilityManifest } from './capabilities'
+export { getRuntimeCapabilityManifest }
 
 type JsonRecord = Record<string, unknown>
 
@@ -168,5 +147,7 @@ export function validateUnknownPageSchema(candidate: unknown): SchemaValidationR
 
 /** Serializable capabilities supplied by the current runtime without application Manifest entries. */
 export function getBuiltinCapabilities(): string[] {
-  return [...builtInCapabilities]
+  return getRuntimeCapabilityKeys()
 }
+
+export { getRuntimeCapabilityKeys }

@@ -1,4 +1,8 @@
-import { getBuiltinCapabilities, validateUnknownPageSchema } from 'best-lowcode-runtime/dev'
+import {
+  getBuiltinCapabilities,
+  getRuntimeCapabilityManifest,
+  validateUnknownPageSchema
+} from 'best-lowcode-runtime/dev'
 import type { Diagnostic, LowcodeAdapter } from '../types'
 
 function toMcpDiagnostic(input: { path?: string; code: string; message: string }): Diagnostic {
@@ -13,6 +17,7 @@ function toMcpDiagnostic(input: { path?: string; code: string; message: string }
 /** Adapts the current best-lowcode-runtime development entry without importing its React runtime. */
 export const bestLowcodeAdapter: LowcodeAdapter = {
   builtInCapabilities: getBuiltinCapabilities,
+  capabilities: getRuntimeCapabilityManifest,
   validateSchema: (candidate) =>
     validateUnknownPageSchema(candidate).diagnostics.map(toMcpDiagnostic)
 }

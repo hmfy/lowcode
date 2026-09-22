@@ -33,6 +33,7 @@ export type HostInstallResult = {
 export type InstallerResult = {
   ok: boolean
   devtools: InstallStatus
+  devtoolsVersion?: string
   devtoolsMessage?: string
   mcpCommand?: string
   hosts: HostInstallResult[]
@@ -135,6 +136,20 @@ async function defaultRunner(command: string, args: string[]): Promise<CommandRe
 
 function bundledSkillDirectory() {
   return resolve(dirname(fileURLToPath(import.meta.url)), '..', 'assets', 'skill')
+}
+
+function devtoolsPackageJsonPath(npmPrefix: string, osPlatform: NodeJS.Platform) {
+  const modulesDirectory = osPlatform === 'win32' ? 'node_modules' : join('lib', 'node_modules')
+  return join(npmPrefix, modulesDirectory, DEVTOOLS_PACKAGE, 'package.json')
+}
+
+async function installedDevtoolsVersion(npmPrefix: string, osPlatform: NodeJS.Platform) {
+  const packageJson = await readFile(devtoolsPackageJsonPath(npmPrefix, osPlatform), 'utf8')
+  const packageInfo = JSON.parse(packageJson) as { version?: unknown }
+  if (typeof packageInfo.version !== 'string' || !packageInfo.version) {
+    throw new Error(`缺少 ${DEVTOOLS_PACKAGE} 的有效 version`)
+  }
+  return packageInfo.version
 }
 
 function normalizeOutput(result: CommandResult) {
@@ -365,7 +380,14 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
   const sourceSkill = options.skillSourceDir ?? bundledSkillDirectory()
   const npmPrefix = join(homeDir, '.best-lowcode')
   progress(`1/3 正在安装 DevTools（${version}）…`)
-  const devtoolsInstall = await runner('npm', ['install', '--global', '--prefix', npmPrefix, `${DEVTOOLS_PACKAGE}@${version}`])
+  const devtoolsInstall = await runner('npm', [
+    'install',
+    '--global',
+    '--prefix',
+    npmPrefix,
+    '--prefer-online',
+    `${DEVTOOLS_PACKAGE}@${version}`
+  ])
 
   if (!devtoolsInstall.ok) {
     progress('✗ DevTools 安装失败')
@@ -395,6 +417,13 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
       hosts: []
     }
   }
+  let actualDevtoolsVersion: string | undefined
+  let devtoolsVersionMessage: string | undefined
+  try {
+    actualDevtoolsVersion = await installedDevtoolsVersion(npmPrefix, osPlatform)
+  } catch (error) {
+    devtoolsVersionMessage = `无法读取实际 DevTools 版本：${error instanceof Error ? error.message : '未知错误'}`
+  }
   progress(`✓ DevTools 已安装：${npmPrefix}`)
 
   progress('2/3 正在探测 Codex 与 Cursor…')
@@ -417,6 +446,8 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
     return {
       ok: true,
       devtools: 'installed',
+      devtoolsVersion: actualDevtoolsVersion,
+      devtoolsMessage: devtoolsVersionMessage,
       hosts: []
     }
   }
@@ -427,6 +458,7 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
     return {
       ok: false,
       devtools: 'installed',
+      devtoolsVersion: actualDevtoolsVersion,
       devtoolsMessage: `无法解析 DevTools 安装目录：${prefix.stderr || prefix.stdout}`,
       hosts: []
     }
@@ -461,6 +493,8 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
   const result: InstallerResult = {
     ok: hostResults.every((host) => host.skill !== 'failed' && host.mcp !== 'failed'),
     devtools: 'installed',
+    devtoolsVersion: actualDevtoolsVersion,
+    devtoolsMessage: devtoolsVersionMessage,
     mcpCommand,
     hosts: hostResults
   }
