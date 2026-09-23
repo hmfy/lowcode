@@ -16,13 +16,16 @@ export type BestSlotContext = {
   record?: Record<string, unknown>
   value?: unknown
   values?: Record<string, unknown>
-}
-export type BestActionContext = BestSlotContext & {
+  /** Current list filters for page-header business controls. */
+  query?: Record<string, unknown>
+  /** Update page filters and refresh the list. Available to page-header slots. */
+  setQuery?: (query: Record<string, unknown>) => void
+  /** Refresh the Runtime-owned list. Available to page-header slots. */
+  reload?: () => void
   selectedRowKeys?: Array<string | number>
   selectedRecords?: Record<string, unknown>[]
-  query?: Record<string, unknown>
-  activeTab?: string
 }
+export type BestActionContext = BestSlotContext
 export type BestAction = (context: BestActionContext) => void | Promise<void>
 export type BestSlot = (context: BestSlotContext) => ReactNode
 export type BestSlotRegistry = Record<string, BestSlot>

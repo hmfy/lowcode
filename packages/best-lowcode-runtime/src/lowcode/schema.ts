@@ -92,11 +92,9 @@ export type TableRowSelectionSchema = {
   preserveSelectedRowKeys?: boolean
 }
 
-export type TableStatusTabSchema = {
-  key: string
-  label: string
-  value?: string | number | boolean | null
-  count?: number
+/** Business-owned content rendered in a Runtime-managed page header region. */
+export type PageHeaderSlotSchema = {
+  slot: string
 }
 
 export type TableToolbarSchema = {
@@ -193,14 +191,11 @@ export type CrudPageSchema = {
     columns: TableColumnSchema[]
     actions?: PageActionSchema[]
     scrollX?: number
+    /** Explicit table body height override for business-owned bounded layouts. */
+    scrollY?: number
     pageSize?: number
     expandable?: TableExpandableSchema
     rowSelection?: TableRowSelectionSchema
-    statusTabs?: {
-      field: string
-      items: TableStatusTabSchema[]
-      defaultKey?: string
-    }
     toolbar?: TableToolbarSchema
   }
   searchConfig?: {
@@ -208,6 +203,14 @@ export type CrudPageSchema = {
     defaultCollapsed?: boolean
     collapseAfter?: number
     columns?: number
+  }
+  /**
+   * Business-owned filter controls, such as status Tabs, Segmented controls or button groups.
+   * Slots receive the current query plus setQuery/reload helpers from the Runtime.
+   */
+  header?: {
+    beforeSearch?: PageHeaderSlotSchema
+    afterSearch?: PageHeaderSlotSchema
   }
   detail?: {
     /** Defaults to drawer when omitted. */

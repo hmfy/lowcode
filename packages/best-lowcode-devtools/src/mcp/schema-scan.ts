@@ -50,6 +50,7 @@ function scanPageArchitecture(content: string, fileName: string) {
     ts.ScriptKind.TSX
   )
   let hasProvider = false
+  let hasBestPage = false
   let hasCrudPage = false
   let hasTabbedPage = false
   let hiddenRuntimePage = false
@@ -59,6 +60,7 @@ function scanPageArchitecture(content: string, fileName: string) {
       const name = jsxName(opening.tagName)
       const hidden = hiddenAncestor || hasHiddenAttribute(opening)
       if (name === 'BestProvider') hasProvider = true
+      if (name === 'BestPage') hasBestPage = true
       if (name === 'BestCrudPage') {
         hasCrudPage = true
         hiddenRuntimePage ||= hidden
@@ -73,7 +75,7 @@ function scanPageArchitecture(content: string, fileName: string) {
     ts.forEachChild(node, (child) => visit(child, hiddenAncestor))
   }
   visit(source)
-  return { hasProvider, hasCrudPage, hasTabbedPage, hiddenRuntimePage }
+  return { hasProvider, hasBestPage, hasCrudPage, hasTabbedPage, hiddenRuntimePage }
 }
 
 function schemaRuntimeComponent(schema: StaticSchemaValue): RuntimePageComponent {
@@ -83,12 +85,18 @@ function schemaRuntimeComponent(schema: StaticSchemaValue): RuntimePageComponent
     : 'BestCrudPage'
 }
 
-type RuntimePageComponent = 'BestCrudPage' | 'BestTabbedPage'
+type RuntimePageComponent = 'BestPage' | 'BestCrudPage' | 'BestTabbedPage'
 
-type RegistryServiceBindings = {
+type RegistryKeyBindings = {
   listServices: Map<string, ts.Expression>
   services: Map<string, ts.Expression>
+  dictionaries: Map<string, ts.Expression>
+  actions: Map<string, ts.Expression>
+  slots: Map<string, ts.Expression>
 }
+
+type RegistryServiceGroup = 'listServices' | 'services'
+type RegistryRuntimeGroup = 'dictionaries' | 'actions' | 'slots'
 
 type IndexRuntimeBindings = {
   registryBindings: Set<string>
@@ -185,18 +193,21 @@ function validateIndexBindings(
         name === 'BestProvider'
           ? importedBinding(jsxAttributeExpression(opening, 'registry'), registryImportBindings)
           : providerRegistry
+      const pageRegistry = name === 'BestPage'
+        ? importedBinding(jsxAttributeExpression(opening, 'registry'), registryImportBindings)
+        : undefined
       if (name === expectedComponent) {
         if (isImportedIdentifier(jsxAttributeExpression(opening, 'schema'), schemaBindings)) {
           schemaBound = true
-          if (nextProviderRegistry) {
+          if (pageRegistry || nextProviderRegistry) {
             runtimeBound = true
-            runtimeRegistryBindings.add(nextProviderRegistry)
+            runtimeRegistryBindings.add(pageRegistry ?? nextProviderRegistry!)
           } else {
             hasUnboundRuntime = true
           }
         }
       }
-      ts.forEachChild(node, (child) => visit(child, nextProviderRegistry))
+      ts.forEachChild(node, (child) => visit(child, pageRegistry ?? nextProviderRegistry))
       return
     }
     ts.forEachChild(node, (child) => visit(child, providerRegistry))
@@ -225,27 +236,35 @@ function validateIndexBindings(
   return { registryBindings: runtimeRegistryBindings }
 }
 
-function registryServiceBindings(
+function registryKeyBindings(
   content: string,
   registryPath: string,
   registryBinding: string
-): RegistryServiceBindings {
+): RegistryKeyBindings {
   const source = ts.createSourceFile(registryPath, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
-  const bindings: RegistryServiceBindings = { listServices: new Map(), services: new Map() }
+  const bindings: RegistryKeyBindings = {
+    listServices: new Map(),
+    services: new Map(),
+    dictionaries: new Map(),
+    actions: new Map(),
+    slots: new Map()
+  }
   function collectMappings(value: ts.Expression) {
     value = unwrapExpression(value)
     if (!ts.isObjectLiteralExpression(value)) return
+    const groups = ['listServices', 'services', 'dictionaries', 'actions', 'slots'] as const
     for (const property of value.properties) {
       if (!ts.isPropertyAssignment(property)) continue
       const group = property.name.getText()
       const mappings = unwrapExpression(property.initializer)
-      if ((group !== 'listServices' && group !== 'services') || !ts.isObjectLiteralExpression(mappings)) continue
+      if (!(groups as readonly string[]).includes(group) || !ts.isObjectLiteralExpression(mappings)) continue
+      const typedGroup = group as (typeof groups)[number]
       for (const mapping of mappings.properties) {
         if (!ts.isPropertyAssignment(mapping)) continue
         const key = ts.isIdentifier(mapping.name) || ts.isStringLiteral(mapping.name)
           ? mapping.name.text
           : undefined
-        if (key) bindings[group].set(key, mapping.initializer)
+        if (key) bindings[typedGroup].set(key, mapping.initializer)
       }
     }
   }
@@ -307,7 +326,7 @@ function collectCrudSchemas(schemas: Array<Record<string, StaticSchemaValue>>) {
 }
 
 function schemaServiceReferences(schemas: Array<Record<string, StaticSchemaValue>>) {
-  const services: Array<{ id: string; group: keyof RegistryServiceBindings }> = []
+  const services: Array<{ id: string; group: RegistryServiceGroup }> = []
   for (const schema of collectCrudSchemas(schemas)) {
     const dataSource = schema.dataSource
     if (!isStaticRecord(dataSource)) continue
@@ -330,7 +349,7 @@ function validateRegistryAdapterBindings(
   const source = ts.createSourceFile(registryPath, registryContent, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
   const adapterBindings = moduleImportBindings(source, './adapter')
   for (const registryBinding of registryBindings) {
-    const mappings = registryServiceBindings(registryContent, registryPath, registryBinding)
+    const mappings = registryKeyBindings(registryContent, registryPath, registryBinding)
     const seen = new Set<string>()
     for (const { id, group } of schemaServiceReferences(schemas)) {
     const key = `${group}:${id}`
@@ -358,6 +377,51 @@ function validateRegistryAdapterBindings(
         )
       )
     }
+    }
+  }
+}
+
+function validateRegistryRuntimeReferences(
+  schemas: Array<Record<string, StaticSchemaValue>>,
+  registryContent: string,
+  registryPath: string,
+  registryBindings: Set<string>,
+  capabilityIds: Set<string>,
+  diagnostics: Diagnostic[],
+  relativePath: string
+) {
+  const references: Array<{ id: string; path: string; group: 'dictionaries' | 'actions' | 'slots' }> = []
+  for (const schema of collectCrudSchemas(schemas)) {
+    const pageReferences: Array<{ id: string; path: string }> = []
+    collectReferences(schema, '', pageReferences)
+    for (const reference of pageReferences) {
+      const group = reference.path.endsWith('/dict')
+        ? 'dictionaries'
+        : reference.path.endsWith('/action')
+          ? 'actions'
+          : reference.path.endsWith('/slot')
+            ? 'slots'
+            : undefined
+      if (group) references.push({ ...reference, group })
+    }
+  }
+  for (const registryBinding of registryBindings) {
+    const mappings = registryKeyBindings(registryContent, registryPath, registryBinding)
+    for (const reference of references) {
+      if (capabilityIds.has(reference.id)) continue
+      // Slot registries may be composed from ./slots through a helper; that
+      // source is checked separately by validateFeatureSlotOrganization.
+      if (reference.group === 'slots' && mappings.slots.size === 0) continue
+      if (!mappings[reference.group].has(reference.id)) {
+        diagnostics.push(
+          diagnostic(
+            'error',
+            'architecture.registry.reference.missing',
+            `Schema ${reference.group} 引用 ${reference.id}，但 registry.${reference.group} 未注册。`,
+            `${relativePath}${reference.path}`
+          )
+        )
+      }
     }
   }
 }
@@ -698,7 +762,7 @@ export async function scanTypeScriptSchemas(
     const result = parseStaticCrudSchemas(content, relativePath)
     diagnostics.push(...result.diagnostics)
     const schemas = result.schemas
-    const expectedComponent = schemas.some(
+    const schemaComponent = schemas.some(
       (schema) => schemaRuntimeComponent(schema) === 'BestTabbedPage'
     )
       ? 'BestTabbedPage'
@@ -722,14 +786,21 @@ export async function scanTypeScriptSchemas(
       if (isRuntimeSource) throw new Error('runtime source is not a page')
       const indexContent = await readFile(indexPath, 'utf8')
       const architecture = scanPageArchitecture(indexContent, relativePath)
+      const expectedComponent: RuntimePageComponent = architecture.hasBestPage
+        ? 'BestPage'
+        : schemaComponent
       const hasExpectedComponent =
-        expectedComponent === 'BestTabbedPage' ? architecture.hasTabbedPage : architecture.hasCrudPage
-      if (!hasExpectedComponent || !architecture.hasProvider) {
+        expectedComponent === 'BestPage'
+          ? architecture.hasBestPage
+          : expectedComponent === 'BestTabbedPage'
+            ? architecture.hasTabbedPage
+            : architecture.hasCrudPage
+      if (!hasExpectedComponent || (expectedComponent !== 'BestPage' && !architecture.hasProvider)) {
         diagnostics.push(
           diagnostic(
             'error',
             'architecture.component.missing',
-            `BEST 页面入口必须渲染 BestProvider 与 ${expectedComponent}，禁止使用常规组件库页面替代。`,
+            `BEST 页面入口必须渲染 ${expectedComponent === 'BestPage' ? 'BestPage' : `BestProvider 与 ${expectedComponent}`}，禁止使用常规组件库页面替代。`,
             relative(rootDir, indexPath).split(sep).join('/')
           )
         )
@@ -766,6 +837,15 @@ export async function scanTypeScriptSchemas(
           // complete mapping; a valid sibling registry cannot mask a broken one.
           // An empty set is already reported by validateIndexBindings.
           indexBindings.registryBindings,
+          diagnostics,
+          relativePath
+        )
+        validateRegistryRuntimeReferences(
+          schemas,
+          registryContent,
+          registryPath,
+          indexBindings.registryBindings,
+          capabilityIds,
           diagnostics,
           relativePath
         )

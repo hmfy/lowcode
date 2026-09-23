@@ -214,15 +214,13 @@ function createIndexTemplate(input: {
   schemaVariable: string
 }) {
   return `import 'best-lowcode-runtime/style.css'
-import { BestCrudPage, BestProvider } from 'best-lowcode-runtime'
+import { BestPage } from 'best-lowcode-runtime'
 import { ${input.registryVariable} } from './registry'
 import { ${input.schemaVariable} } from '${input.schemaModulePath}'
 
 export default function ${input.componentName}() {
   return (
-    <BestProvider registry={${input.registryVariable}}>
-      <BestCrudPage schema={${input.schemaVariable}} />
-    </BestProvider>
+    <BestPage registry={${input.registryVariable}} schema={${input.schemaVariable}} />
   )
 }
 `

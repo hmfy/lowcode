@@ -42,6 +42,8 @@ type RecordValue = Record<string, unknown>
 
 export type BestCrudPageProps = {
   className?: string
+  /** `fill` consumes the bounded Runtime page host and gives the table its remaining height. */
+  layout?: 'auto' | 'fill'
   schema: CrudPageSchema
   adapter?: CrudDataAdapter
 }
@@ -367,7 +369,7 @@ function confirmAction(content: string) {
   })
 }
 
-export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) {
+export function BestCrudPage({ adapter, className, layout = 'fill', schema }: BestCrudPageProps) {
   const registry = useBestRegistry()
   assertValidCrudPageSchema(schema, registry)
   const registeredListService = useBestListService(schema.dataSource.list)
@@ -422,14 +424,14 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
   const detailRequestRef = useRef<AbortController | undefined>(undefined)
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
+  const pageRef = useRef<HTMLDivElement>(null)
+  const tableRegionRef = useRef<HTMLDivElement>(null)
   const [tableRecords, setTableRecords] = useState<RecordValue[]>([])
+  const [availableTableScrollHeight, setAvailableTableScrollHeight] = useState<number>()
   const [expandedRowKeys, setExpandedRowKeys] = useState<Key[]>(
     schema.table.expandable?.defaultExpandedRowKeys ?? []
   )
   const expansionInitializedRef = useRef(false)
-  const defaultStatusTab = schema.table.statusTabs?.defaultKey ?? schema.table.statusTabs?.items[0]?.key
-  const [activeTab, setActiveTab] = useState(defaultStatusTab)
-  const activeTabRef = useRef(activeTab)
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
   const selectedRowKeysRef = useRef<Key[]>([])
   const selectedRecordsRef = useRef<Record<string, unknown>[]>([])
@@ -440,15 +442,6 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
         : String(record[schema.table.rowKey] ?? ''),
     [schema.table.rowKey]
   )
-
-  useEffect(() => {
-    const nextTab = schema.table.statusTabs?.defaultKey ?? schema.table.statusTabs?.items[0]?.key
-    activeTabRef.current = nextTab
-    setActiveTab(nextTab)
-    setSelectedRowKeys([])
-    selectedRowKeysRef.current = []
-    selectedRecordsRef.current = []
-  }, [schema.id, schema.table.statusTabs])
 
   useEffect(() => {
     expansionInitializedRef.current = false
@@ -550,8 +543,7 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
               (key): key is string | number => typeof key === 'string' || typeof key === 'number'
             ),
             selectedRecords: selectedRecordsRef.current,
-            query: queryRef.current,
-            activeTab: activeTabRef.current
+            query: queryRef.current
           })
           actionRef.current?.reload()
         } catch (error) {
@@ -616,14 +608,9 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
         toBestListQuery(
           {
             ...params,
-            ...(useBestSearch ? queryRef.current : {}),
-            ...(schema.table.statusTabs && activeTabRef.current !== undefined
-              ? {
-                  [schema.table.statusTabs.field]:
-                    schema.table.statusTabs.items.find((item) => item.key === activeTabRef.current)?.value ??
-                    activeTabRef.current
-                }
-              : {})
+            // Header Slots own business filter presentation while Runtime owns
+            // the query state and request lifecycle.
+            ...(useBestSearch || schema.header ? queryRef.current : {}),
           },
           sort
         )
@@ -637,7 +624,7 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
       }
       return response
     },
-    [pageRequest, rowKeyOf, schema.table.expandable?.defaultExpandAllRows, schema.table.statusTabs, useBestSearch]
+    [pageRequest, rowKeyOf, schema.header, schema.table.expandable?.defaultExpandAllRows, useBestSearch]
   )
 
   const expandedColumns = useMemo(
@@ -661,7 +648,6 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
   )
 
   const toolbarOptions = schema.table.toolbar
-  const statusTabs = schema.table.statusTabs
   const expandableSchema = schema.table.expandable
   const detailMode = schema.detail?.mode ?? 'drawer'
   const expandableKeys = useMemo(() => tableRecords.map(rowKeyOf), [rowKeyOf, tableRecords])
@@ -696,6 +682,41 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
       userTouched: shouldUseDefaults ? false : previous.userTouched
     }
   }, [schema.id, searchDefaultValues, searchFieldNames, searchSchemaSignature])
+
+  useLayoutEffect(() => {
+    if (layout !== 'fill') {
+      setAvailableTableScrollHeight(undefined)
+      return
+    }
+    const page = pageRef.current
+    const tableRegion = tableRegionRef.current
+    if (!page || !tableRegion) return
+
+    const updateAvailableHeight = () => {
+      const tableBodyTop = tableRegion.querySelector('.ant-table-tbody')?.getBoundingClientRect().top
+      const paginationElement = tableRegion.querySelector('.ant-pagination') as HTMLElement | null
+      const pagination = paginationElement?.getBoundingClientRect()
+      const paginationStyle = paginationElement ? getComputedStyle(paginationElement) : undefined
+      const paginationSpacing = paginationStyle
+        ? (parseFloat(paginationStyle.marginTop) || 0) + (parseFloat(paginationStyle.marginBottom) || 0)
+        : 0
+      const regionBottom = tableRegion.getBoundingClientRect().bottom
+      if (!tableBodyTop) return
+      const nextHeight = Math.max(
+        120,
+        // Keep a small border-safe inset so the last row is not clipped by the table container.
+        Math.floor(regionBottom - tableBodyTop - (pagination?.height ?? 0) - paginationSpacing - 14)
+      )
+      setAvailableTableScrollHeight((current) => current === nextHeight ? current : nextHeight)
+    }
+
+    updateAvailableHeight()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(updateAvailableHeight)
+    observer.observe(page)
+    observer.observe(tableRegion)
+    return () => observer.disconnect()
+  }, [expandedRowKeys, layout, tableRecords.length])
 
   useEffect(() => () => pageRequest.abort(), [pageRequest])
 
@@ -747,8 +768,29 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
     ]
   )
 
+  const setPageQuery = useCallback((nextQuery: RecordValue) => {
+    queryRef.current = nextQuery
+    queryStateRef.current = { ...queryStateRef.current, userTouched: true }
+    setQuery(nextQuery)
+    actionRef.current?.reload()
+  }, [])
+
+  const renderHeaderSlot = (slot?: string) => slot
+    ? registry.slots[slot]?.({
+        pageId: schema.id,
+        query,
+        setQuery: setPageQuery,
+        reload: () => actionRef.current?.reload(),
+        selectedRowKeys: selectedRowKeysRef.current.filter(
+          (key): key is string | number => typeof key === 'string' || typeof key === 'number'
+        ),
+        selectedRecords: selectedRecordsRef.current
+      }) ?? null
+    : null
+
   return (
-    <>
+    <div ref={pageRef} className={`best-lowcode-page${layout === 'fill' ? ' best-lowcode-page--fill' : ''}`}>
+      {renderHeaderSlot(schema.header?.beforeSearch?.slot)}
       {useBestSearch && searchFields.length ? (
         <BestSearch
           fields={searchFields}
@@ -773,26 +815,8 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
           }}
         />
       ) : null}
-      {statusTabs ? (
-        <div role='tablist' style={{ display: 'flex', gap: 20, borderBottom: '1px solid #f0f0f0', marginBottom: 8 }}>
-          {statusTabs.items.map((tab) => {
-            const selected = activeTab === tab.key
-            return (
-              <Button
-                key={tab.key}
-                type={selected ? 'primary' : 'text'}
-                onClick={() => {
-                  activeTabRef.current = tab.key
-                  setActiveTab(tab.key)
-                  actionRef.current?.reload()
-                }}
-              >
-                {tab.label}{tab.count === undefined ? '' : ` (${tab.count})`}
-              </Button>
-            )
-          })}
-        </div>
-      ) : null}
+      {renderHeaderSlot(schema.header?.afterSearch?.slot)}
+      <div ref={tableRegionRef} className='best-lowcode-table-region'>
       <BestTable<RecordValue, RecordValue>
         actionRef={actionRef}
         className={className}
@@ -815,6 +839,8 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
               {allRowsExpanded ? '收起全部' : '展开全部'}
             </Button>
           ) : undefined,
+          // The default expand-icon width clips a header action label.
+          columnWidth: expandableSchema.showExpandAll ? 84 : undefined,
           indentSize: expandableSchema.indentSize,
           expandedRowRender: expandableSchema.dataField && expandedColumns
             ? (record) => {
@@ -838,7 +864,14 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
         } : undefined}
         options={toolbarOptions?.columnSettings ? { setting: true, reload: false, density: false } : false}
         search={useBestSearch ? false : proTableSearch}
-        scroll={schema.table.scrollX ? { x: schema.table.scrollX } : undefined}
+        scroll={{
+          ...(schema.table.scrollX ? { x: schema.table.scrollX } : {}),
+          ...(schema.table.scrollY !== undefined
+            ? { y: schema.table.scrollY }
+            : layout === 'fill' && availableTableScrollHeight
+              ? { y: availableTableScrollHeight }
+              : {})
+        }}
         toolBarRender={() => [
           ...(schema.toolbar?.map((action) => (
             <ActionButton action={action} key={action.id} onExecute={handleAction} />
@@ -851,6 +884,7 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
           ] : [])
         ]}
       />
+      </div>
       {drawer.mode === 'detail' && detailMode === 'inline' ? (
         <DetailContent state={detailState} record={drawer.record} />
       ) : null}
@@ -893,7 +927,7 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
           />
         ) : null}
       </BestModal> : null}
-    </>
+    </div>
   )
 
   function DetailContent({ state, record }: { state: DetailState; record?: RecordValue }) {
@@ -921,11 +955,22 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
   }) {
     const permitted = !action.access || registry.access(action.access)
     if (!permitted) return null
+    // Table actions are intentionally row-data driven. Page-level filters and
+    // selections belong to business filter Slots and batch action handlers.
     const visible = !action.visibleWhen || evaluateCondition(action.visibleWhen, record ?? {}, 'detail')
     if (!visible) return null
     const disabled = Boolean(action.disabledWhen && evaluateCondition(action.disabledWhen, record ?? {}, 'detail'))
     if (action.effect === 'slot' && action.slot) {
-      return registry.slots[action.slot]?.({ record }) ?? null
+      return registry.slots[action.slot]?.({
+        pageId: schema.id,
+        record,
+        query: queryRef.current,
+        reload: () => actionRef.current?.reload(),
+        selectedRowKeys: selectedRowKeysRef.current.filter(
+          (key): key is string | number => typeof key === 'string' || typeof key === 'number'
+        ),
+        selectedRecords: selectedRecordsRef.current
+      }) ?? null
     }
     return (
       <Button

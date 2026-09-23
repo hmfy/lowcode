@@ -1,7 +1,119 @@
-.best-lowcode-table .ant-table-wrapper {
-    border: 1px solid #f0f0f0;
-    border-radius: 4px;
+.best-lowcode-page-host--fill {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+}
+
+.best-lowcode-page {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
+}
+
+.best-lowcode-page--fill {
+    flex: 1 1 auto;
+    height: 100%;
+}
+
+.best-lowcode-page .best-lowcode-table-region,
+.best-lowcode-page .best-lowcode-table {
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+}
+
+.best-lowcode-page .best-lowcode-table-region {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.best-lowcode-page .best-lowcode-table-region .best-lowcode-table {
+    height: 100%;
+}
+
+/* Keep the table controls in a bounded column. The table body is the only
+ * part that may scroll, so pagination stays anchored to the bottom. */
+.best-lowcode-page .best-lowcode-table {
+    display: flex;
+    flex-direction: column;
+}
+
+.best-lowcode-page .best-lowcode-table > .ant-pro-card:not(.ant-pro-table-search),
+.best-lowcode-page .best-lowcode-table > .ant-pro-card:not(.ant-pro-table-search) .ant-pro-card-body {
+    min-height: 0;
+}
+
+.best-lowcode-page .best-lowcode-table > .ant-pro-card:not(.ant-pro-table-search) {
+    flex: 1 1 auto;
+}
+
+.best-lowcode-page .best-lowcode-table > .ant-pro-card:not(.ant-pro-table-search) .ant-pro-card-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+}
+
+.best-lowcode-page .best-lowcode-table .ant-pro-table-list-toolbar {
+    flex: 0 0 auto;
+}
+
+.best-lowcode-page .best-lowcode-table .ant-table-wrapper {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.best-lowcode-page .best-lowcode-table .ant-table-wrapper > .ant-spin,
+.best-lowcode-page .best-lowcode-table .ant-table-wrapper .ant-spin-container {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.best-lowcode-page .best-lowcode-table .ant-table-wrapper .ant-table-container {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.best-lowcode-page .best-lowcode-table .ant-table-wrapper .ant-spin-container > .ant-table {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.best-lowcode-page .best-lowcode-table .ant-table-wrapper .ant-pagination {
+    flex: 0 0 auto;
+}
+
+.best-lowcode-table .ant-table-wrapper {
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+}
+
+/* Pagination is a page control, not part of the table's visual frame. */
+.best-lowcode-table .ant-table-wrapper .ant-table-container {
+    border: 0;
+    border-radius: 0;
+    overflow: hidden;
+}
+
+.best-lowcode-table .ant-table-wrapper .ant-pagination {
+    margin: 16px 0 0;
+    padding: 0;
+}
+
+/* ProTable sets `overflow-y: scroll` whenever scroll.y is supplied. Runtime
+ * uses scroll.y only as an upper bound, so short result sets must retain their
+ * natural height and show no inactive scrollbar. */
+.best-lowcode-table .ant-table-body {
+    overflow-y: auto !important;
 }
 
 .best-lowcode-table .ant-table-wrapper .ant-table.ant-table-medium .ant-table-thead > tr > th {

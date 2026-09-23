@@ -89,7 +89,7 @@ describe('best page create', () => {
     ).resolves.toContain("list: 'demo.order-list.list'")
     await expect(
       readFile(join(root, 'apps/demo/src/pages/order-list/index.tsx'), 'utf8')
-    ).resolves.toContain('<BestCrudPage schema={orderListSchema} />')
+    ).resolves.toContain('<BestPage registry={orderListRegistry} schema={orderListSchema} />')
     await expect(
       readFile(join(root, 'apps/demo/src/pages/order-list/slots/index.ts'), 'utf8')
     ).resolves.toContain('orderListSlots')

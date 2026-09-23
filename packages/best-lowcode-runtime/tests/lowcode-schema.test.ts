@@ -1,13 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { CrudPageSchema, TabbedPageSchema } from '../src/lowcode/schema'
-import { TABBED_PAGE_SCHEMA_ID, TABBED_PAGE_SCHEMA_VERSION } from '../src/lowcode/schema'
+import { CRUD_SCHEMA_ID, CRUD_SCHEMA_VERSION, TABBED_PAGE_SCHEMA_ID, TABBED_PAGE_SCHEMA_VERSION } from '../src/lowcode/schema'
 import {
   getRuntimeCapabilityManifest,
   getBuiltinCapabilities,
   validateUnknownCrudPageSchema,
   validateUnknownPageSchema
 } from '../src/lowcode/dev'
-import { validateCrudPageSchema, validateTabbedPageSchema } from '../src/lowcode/validate'
+import {
+  validateBestPageSchema,
+  validateCrudPageSchema,
+  validateTabbedPageSchema
+} from '../src/lowcode/validate'
 import { composeBestRegistry, createBestRegistry } from '../src/runtime'
 
 const deleteAction = { id: 'remove', label: '删除', effect: 'remove' } as const
@@ -81,6 +85,19 @@ describe('lowcode schema', () => {
     ).toEqual({ valid: true, diagnostics: [] })
   })
 
+  it('validates the complete page dependency closure before mount', () => {
+    const result = validateBestPageSchema(
+      {
+        ...crudSchema({ list: 'customer.list' }),
+        search: [{ field: 'status', label: '状态', component: 'select', dict: 'customer.status' }]
+      },
+      createBestRegistry({ listServices: { 'customer.list': vi.fn() } })
+    )
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'registry.dictionary', path: '/search/0' })
+    )
+  })
+
   it('requires create and update services when they are declared', () => {
     const schema = {
       ...crudSchema({ list: 'customer.list', remove: 'customer.remove' }),
@@ -147,6 +164,34 @@ describe('lowcode schema', () => {
       }
     })
     expect(result.valid).toBe(true)
+  })
+
+  it('requires registered business filter slots in page header regions', () => {
+    const result = validateUnknownCrudPageSchema({
+      $schema: 'https://best.dev/schema/crud/v1',
+      version: 1,
+      id: 'test',
+      kind: 'crud',
+      title: '测试页',
+      dataSource: { list: 'test.list' },
+      header: { beforeSearch: { slot: 'customer.filter' } },
+      table: { rowKey: 'id', columns: [{ field: 'id', title: 'ID' }] }
+    })
+    expect(result.valid).toBe(true)
+
+    const invalid = validateCrudPageSchema({
+      $schema: CRUD_SCHEMA_ID,
+      version: CRUD_SCHEMA_VERSION,
+      id: 'test',
+      kind: 'crud',
+      title: '测试页',
+      dataSource: { list: 'test.list' },
+      header: { beforeSearch: { slot: 'customer.filter' } },
+      table: { rowKey: 'id', columns: [{ field: 'id', title: 'ID' }] }
+    }, createBestRegistry())
+    expect(invalid.diagnostics).toContainEqual(
+      expect.objectContaining({ path: '/header/beforeSearch/slot', code: 'registry.slot' })
+    )
   })
 
   it('accepts composite table columns without a source field', () => {

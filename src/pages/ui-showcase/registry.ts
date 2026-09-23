@@ -1,5 +1,6 @@
 import type { BestProviderProps } from 'best-lowcode-runtime'
 import { createElement } from 'react'
+import { Button, Space } from 'antd'
 
 const people = [
   {
@@ -106,6 +107,18 @@ export const showcaseRegistry: NonNullable<BestProviderProps['registry']> = {
     'showcase.export': async () => undefined
   },
   slots: {
+    'showcase.peopleStatusFilter': ({ query, setQuery }) => createElement(
+      Space,
+      { style: { marginBottom: 8 } },
+      ['全部', '启用中', '待审核'].map((label) => {
+        const status = label === '全部' ? '' : label === '启用中' ? 'active' : 'pending'
+        return createElement(Button, {
+          key: status || 'all',
+          type: query?.status === status ? 'primary' : 'default',
+          onClick: () => setQuery?.({ ...(query ?? {}), status })
+        }, label)
+      })
+    ),
     'showcase.summary': () => createElement('div', { style: { padding: 24 } },
       createElement('strong', null, '自定义 Slot 面板'),
       createElement('p', null, '标签页可以承载由应用注册的任意 React 内容。'))

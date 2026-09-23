@@ -13,15 +13,17 @@ const spies = vi.hoisted(() => ({
   success: vi.fn(),
   request: undefined as undefined | ((params: Record<string, unknown>) => Promise<unknown>),
   actionContext: undefined as undefined | Record<string, unknown>,
+  slotContext: undefined as undefined | Record<string, unknown>,
   tableProps: undefined as undefined | {
-    expandable?: { childrenColumnName?: string; defaultExpandAllRows?: boolean; indentSize?: number; expandedRowKeys?: unknown[]; columnTitle?: ReactNode; onExpandedRowsChange?: (keys: unknown[]) => void; expandedRowRender?: (record: Record<string, unknown>) => ReactNode }
+    expandable?: { childrenColumnName?: string; columnWidth?: number; defaultExpandAllRows?: boolean; indentSize?: number; expandedRowKeys?: unknown[]; columnTitle?: ReactNode; onExpandedRowsChange?: (keys: unknown[]) => void; expandedRowRender?: (record: Record<string, unknown>) => ReactNode }
     rowSelection?: { type?: string; checkStrictly?: boolean; selectedRowKeys?: unknown[]; onChange?: (keys: unknown[], rows?: Record<string, unknown>[]) => void }
+    scroll?: { x?: number; y?: number }
   }
 }))
 
 vi.mock('antd', () => ({
-  Button: ({ children, onClick, type: buttonType }: { children: ReactNode; onClick?: () => void; type?: string }) => (
-    <button onClick={onClick} data-button-type={buttonType} type='button'>
+  Button: ({ children, disabled, onClick, type: buttonType }: { children: ReactNode; disabled?: boolean; onClick?: () => void; type?: string }) => (
+    <button disabled={disabled} onClick={onClick} data-button-type={buttonType} type='button'>
       {children}
     </button>
   ),
@@ -79,17 +81,19 @@ vi.mock('../src/ui', () => ({
     request,
     toolBarRender,
     expandable,
-    rowSelection
+    rowSelection,
+    scroll
   }: {
     actionRef: { current?: { reload: () => void } }
     columns: TableColumn[]
     request: (params: Record<string, unknown>) => Promise<unknown>
     toolBarRender?: () => ReactNode[]
-    expandable?: { childrenColumnName?: string; defaultExpandAllRows?: boolean; indentSize?: number; expandedRowKeys?: unknown[]; columnTitle?: ReactNode; onExpandedRowsChange?: (keys: unknown[]) => void; expandedRowRender?: (record: Record<string, unknown>) => ReactNode }
+    expandable?: { childrenColumnName?: string; columnWidth?: number; defaultExpandAllRows?: boolean; indentSize?: number; expandedRowKeys?: unknown[]; columnTitle?: ReactNode; onExpandedRowsChange?: (keys: unknown[]) => void; expandedRowRender?: (record: Record<string, unknown>) => ReactNode }
     rowSelection?: { type?: string; checkStrictly?: boolean; selectedRowKeys?: unknown[]; onChange?: (keys: unknown[], rows?: Record<string, unknown>[]) => void }
+    scroll?: { x?: number; y?: number }
   }) => {
     spies.request = request
-    spies.tableProps = { expandable, rowSelection }
+    spies.tableProps = { expandable, rowSelection, scroll }
     useEffect(() => {
       actionRef.current = {
         reload: () => {
@@ -182,10 +186,74 @@ afterEach(() => {
   vi.clearAllMocks()
   spies.request = undefined
   spies.actionContext = undefined
+  spies.slotContext = undefined
   spies.tableProps = undefined
 })
 
 describe('BestCrudPage', () => {
+  it('uses fill layout by default', () => {
+    renderPage({
+      listServices: { 'customer.list': vi.fn().mockResolvedValue({ items: [], total: 0 }) },
+      services: { 'customer.create': vi.fn(), 'customer.update': vi.fn(), 'customer.remove': vi.fn() }
+    })
+
+    expect(document.querySelector('.best-lowcode-page--fill')).toBeTruthy()
+  })
+
+  it('does not write a viewport-dependent height to the page root', async () => {
+    renderPage({
+      listServices: { 'customer.list': vi.fn().mockResolvedValue({ items: [], total: 0 }) },
+      services: { 'customer.create': vi.fn(), 'customer.update': vi.fn(), 'customer.remove': vi.fn() }
+    })
+
+    await waitFor(() => expect(spies.request).toBeTypeOf('function'))
+    const pageRoot = document.querySelector('.best-lowcode-page')
+    expect(pageRoot).toBeTruthy()
+    expect(pageRoot?.getAttribute('style') ?? '').not.toContain('height')
+  })
+
+  it('does not create a vertical table scroller for a short result page', async () => {
+    renderPage({
+      listServices: {
+        'customer.list': vi.fn().mockResolvedValue({
+          items: Array.from({ length: 4 }, (_, index) => ({ id: `customer-${index}` })),
+          total: 4
+        })
+      },
+      services: { 'customer.create': vi.fn(), 'customer.update': vi.fn(), 'customer.remove': vi.fn() }
+    })
+
+    await waitFor(() => expect(spies.tableProps?.scroll?.y).toBeUndefined())
+  })
+
+  it('does not impose a fixed vertical scroll height in auto layout', async () => {
+    renderPage({
+      listServices: {
+        'customer.list': vi.fn().mockResolvedValue({
+          items: Array.from({ length: 10 }, (_, index) => ({ id: `customer-${index}` })),
+          total: 10
+        })
+      },
+      services: { 'customer.create': vi.fn(), 'customer.update': vi.fn(), 'customer.remove': vi.fn() }
+    })
+
+    await waitFor(() => expect(spies.tableProps?.scroll?.y).toBeUndefined())
+  })
+
+  it('passes an explicit business-owned table scroll height to BestTable', async () => {
+    const pageSchema = {
+      ...schema,
+      table: { ...schema.table, scrollY: 480 }
+    } satisfies CrudPageSchema
+
+    renderSchemaPage(pageSchema, {
+      listServices: { 'customer.list': vi.fn().mockResolvedValue({ items: [], total: 0 }) },
+      services: { 'customer.create': vi.fn(), 'customer.update': vi.fn(), 'customer.remove': vi.fn() }
+    })
+
+    await waitFor(() => expect(spies.tableProps?.scroll?.y).toBe(480))
+  })
+
   it('uses a drawer when detail mode is omitted', async () => {
     renderPage({
       listServices: { 'customer.list': vi.fn().mockResolvedValue({ items: [], total: 0 }) },
@@ -222,6 +290,7 @@ describe('BestCrudPage', () => {
       defaultExpandedRowKeys: undefined,
       expandedRowKeys: [],
       columnTitle: undefined,
+      columnWidth: undefined,
       onExpandedRowsChange: expect.any(Function),
       expandedRowRender: undefined,
       indentSize: 24
@@ -259,6 +328,7 @@ describe('BestCrudPage', () => {
     })
 
     await waitFor(() => expect(screen.getByRole('button', { name: '展开全部' })).toBeTruthy())
+    expect(spies.tableProps?.expandable?.columnWidth).toBe(84)
     fireEvent.click(screen.getByRole('button', { name: '展开全部' }))
     await waitFor(() => expect(spies.tableProps?.expandable?.expandedRowKeys).toEqual(['customer-1']))
     expect(screen.getByRole('button', { name: '收起全部' })).toBeTruthy()
@@ -267,27 +337,16 @@ describe('BestCrudPage', () => {
     await waitFor(() => expect(spies.tableProps?.expandable?.expandedRowKeys).toEqual([]))
   })
 
-  it('passes status tabs and selected rows to actions', async () => {
+  it('lets a business filter slot update the Runtime-owned query', async () => {
     const list = vi.fn().mockResolvedValue({ items: [{ id: 'customer-1', status: 'created' }], total: 1 })
-    const action = vi.fn((context) => {
-      spies.actionContext = context as Record<string, unknown>
-    })
     const pageSchema = {
       ...schema,
+      header: { beforeSearch: { slot: 'customer.statusFilter' } },
       table: {
         ...schema.table,
-        statusTabs: {
-          field: 'status',
-          items: [
-            { key: 'all', label: '全部' },
-            { key: 'created', label: '已创建' }
-          ],
-          defaultKey: 'created'
-        },
         rowSelection: { enabled: true },
         toolbar: { refresh: true }
-      },
-      toolbar: [{ id: 'batch', label: '批量操作', effect: 'runAction' as const, action: 'batch' }]
+      }
     } satisfies CrudPageSchema
 
     renderSchemaPage(pageSchema, {
@@ -297,19 +356,80 @@ describe('BestCrudPage', () => {
         'customer.update': vi.fn(),
         'customer.remove': vi.fn()
       },
-      actions: { batch: action }
+      slots: {
+        'customer.statusFilter': (context) => {
+          spies.slotContext = context as Record<string, unknown>
+          return <button onClick={() => context.setQuery?.({ ...context.query, status: 'created' })} type='button'>已创建</button>
+        }
+      }
     })
 
     await waitFor(() => expect(list).toHaveBeenCalled())
-    expect(list.mock.calls[0][0].filters).toMatchObject({ status: 'created' })
-    spies.tableProps?.rowSelection?.onChange?.(['customer-1'], [{ id: 'customer-1', status: 'created' }])
-    fireEvent.click(screen.getByRole('button', { name: '批量操作' }))
-    await waitFor(() => expect(action).toHaveBeenCalled())
-    expect(spies.actionContext).toMatchObject({
-      selectedRowKeys: ['customer-1'],
-      selectedRecords: [{ id: 'customer-1', status: 'created' }],
-      activeTab: 'created'
+    expect(spies.slotContext).toMatchObject({ pageId: 'customer-list', query: {} })
+    fireEvent.click(screen.getByRole('button', { name: '已创建' }))
+    await waitFor(() => expect(list.mock.calls.at(-1)?.[0].filters).toMatchObject({ status: 'created' }))
+  })
+
+  it('renders business filter slots before the Runtime search region', async () => {
+    const pageSchema = {
+      ...schema,
+      searchMode: 'bestSearch' as const,
+      search: [{ field: 'name', label: '名称', component: 'input' as const }],
+      header: { beforeSearch: { slot: 'customer.filter' } }
+    } satisfies CrudPageSchema
+
+    renderSchemaPage(pageSchema, {
+      listServices: { 'customer.list': vi.fn().mockResolvedValue({ items: [], total: 0 }) },
+      services: {
+        'customer.create': vi.fn(),
+        'customer.update': vi.fn(),
+        'customer.remove': vi.fn()
+      },
+      slots: { 'customer.filter': () => <div data-testid='business-filter'>业务筛选</div> }
     })
+
+    await waitFor(() => expect(screen.getByTestId('business-filter')).toBeTruthy())
+    const search = screen.getByRole('button', { name: '搜索' })
+    const filter = screen.getByTestId('business-filter')
+    const filterBeforeSearch = Boolean(filter.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(filterBeforeSearch).toBe(true)
+  })
+
+  it('evaluates native table action conditions from the current row data', async () => {
+    const pageSchema = {
+      ...schema,
+      table: {
+        ...schema.table,
+        actions: [
+          {
+            id: 'edit',
+            label: '编辑',
+            effect: 'openEdit' as const,
+            disabledWhen: { operator: 'equals' as const, field: 'name', value: '旧名称' }
+          },
+          {
+            id: 'cancel',
+            label: '取消',
+            effect: 'runAction' as const,
+            action: 'customer.cancel',
+            visibleWhen: { operator: 'equals' as const, field: 'name', value: '不存在' }
+          }
+        ]
+      }
+    } satisfies CrudPageSchema
+
+    renderSchemaPage(pageSchema, {
+      listServices: { 'customer.list': vi.fn().mockResolvedValue({ items: [], total: 0 }) },
+      services: {
+        'customer.create': vi.fn(),
+        'customer.update': vi.fn(),
+        'customer.remove': vi.fn()
+      },
+      actions: { 'customer.cancel': vi.fn() }
+    })
+
+    expect((await screen.findByRole('button', { name: '编辑' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: '取消' })).toBeNull()
   })
 
   it('renders a separate expandable detail table from the configured data field', async () => {

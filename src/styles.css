@@ -15,6 +15,8 @@ body { background: #f5f7fa; font-family: Inter, -apple-system, BlinkMacSystemFon
 .page-heading .ant-typography { margin: 0; }
 .page-heading .ant-typography + .ant-typography { margin-top: 8px; }
 .section-card { margin-top: 16px; }
+.section-card-fixed-height { height: 800px; display: flex; flex-direction: column; overflow: hidden; }
+.section-card-fixed-height .ant-card-body { flex: 1; min-height: 0; overflow: hidden; }
 .editor-placeholder { min-height: 440px; display: grid; place-items: center; }
 .inline-link { padding-left: 0; }
 .table-toolbar { display: flex; margin-bottom: 16px; }

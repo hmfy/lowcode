@@ -22,6 +22,8 @@ export type SchemaValidationResult = {
   diagnostics: SchemaDiagnostic[]
 }
 
+export type BestPageSchema = CrudPageSchema | TabbedPageSchema
+
 const fieldComponents = new Set([
   'input',
   'number',
@@ -252,6 +254,13 @@ export function validateCrudPageSchema(
   if (!schema.table?.rowKey) push(diagnostics, '/table/rowKey', 'table.rowKey', 'rowKey 不能为空')
   if (!schema.table?.columns?.length)
     push(diagnostics, '/table/columns', 'table.columns', '至少需要一列')
+  for (const [placement, headerSlot] of Object.entries(schema.header ?? {})) {
+    if (!headerSlot?.slot) {
+      push(diagnostics, `/header/${placement}/slot`, 'header.slot', '页面头部 Slot 必须指定 slot key')
+    } else if (registry && !registry.slots[headerSlot.slot]) {
+      push(diagnostics, `/header/${placement}/slot`, 'registry.slot', `未注册插槽：${headerSlot.slot}`)
+    }
+  }
   schema.table?.columns?.forEach((column, index) => {
     if (!column.field && !column.composite) {
       push(
@@ -431,5 +440,28 @@ export function assertValidTabbedPageSchema(schema: TabbedPageSchema, registry?:
   if (!result.valid) {
     const message = result.diagnostics.map((item) => `${item.path}: ${item.message}`).join('\n')
     throw new Error(`Schema 校验失败：\n${message}`)
+  }
+}
+
+/**
+ * Validate the complete runtime dependency closure. Unlike the structural
+ * validators, this entry point requires a registry so every service,
+ * dictionary, action and slot referenced by the page is checked before the
+ * page renderer is mounted.
+ */
+export function validateBestPageSchema(
+  schema: BestPageSchema,
+  registry: BestRegistry
+): SchemaValidationResult {
+  return schema.kind === 'tabs'
+    ? validateTabbedPageSchema(schema, registry)
+    : validateCrudPageSchema(schema, registry)
+}
+
+export function assertValidBestPageSchema(schema: BestPageSchema, registry: BestRegistry) {
+  const result = validateBestPageSchema(schema, registry)
+  if (!result.valid) {
+    const message = result.diagnostics.map((item) => `${item.path}: ${item.message}`).join('\n')
+    throw new Error(`BestPage 依赖校验失败：\n${message}`)
   }
 }

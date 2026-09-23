@@ -13,8 +13,8 @@ import {
   BestDrawer,
   BestSearch,
   BestTable,
+  BestPage,
   BestCrudPage,
-  BestTabbedPage,
   CRUD_SCHEMA_ID,
   CRUD_SCHEMA_VERSION,
   TABBED_PAGE_SCHEMA_ID,
@@ -24,7 +24,7 @@ import {
   type CrudPageSchema,
   type TabbedPageSchema
 } from 'best-lowcode-runtime'
-import { showcasePeople } from './registry'
+import { showcasePeople, showcaseRegistry } from './registry'
 
 const { Title, Paragraph, Text } = Typography
 type Person = (typeof showcasePeople)[number]
@@ -33,8 +33,8 @@ function ShowcaseHeading({ title, description }: { title: string; description: s
   return <div className="page-heading"><div><Title level={2}>{title}</Title><Paragraph type="secondary">{description}</Paragraph></div></div>
 }
 
-function ShowcaseCard({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
-  return <Card title={title} className="section-card" extra={description ? <Text type="secondary">{description}</Text> : undefined}>{children}</Card>
+function ShowcaseCard({ title, description, className, children }: { title: string; description?: string; className?: string; children: React.ReactNode }) {
+  return <Card title={title} className={`section-card${className ? ` ${className}` : ''}`} extra={description ? <Text type="secondary">{description}</Text> : undefined}>{children}</Card>
 }
 
 const columns: BestTableColumn<Person>[] = [
@@ -134,6 +134,7 @@ const capabilityCrudSchema: CrudPageSchema = {
     { field: 'budget', label: '年度预算', component: 'number' }
   ],
   searchConfig: { collapsible: true, defaultCollapsed: false, collapseAfter: 2 },
+  header: { beforeSearch: { slot: 'showcase.peopleStatusFilter' } },
   table: {
     rowKey: 'id',
     columns: [
@@ -143,15 +144,6 @@ const capabilityCrudSchema: CrudPageSchema = {
       { field: 'joinedAt', title: '入职日期', format: 'date', width: 140 },
       { field: 'budget', title: '年度预算', format: 'money', width: 140 }
     ],
-    statusTabs: {
-      field: 'status',
-      defaultKey: 'all',
-      items: [
-        { key: 'all', label: '全部', value: '' },
-        { key: 'active', label: '启用中', value: 'active', count: 3 },
-        { key: 'pending', label: '待审核', value: 'pending', count: 1 }
-      ]
-    },
     rowSelection: { enabled: true, preserveSelectedRowKeys: true },
     toolbar: {
       refresh: true,
@@ -204,8 +196,8 @@ const tabsSchema: TabbedPageSchema = {
 
 export function PagesShowcasePage() {
   return <section><ShowcaseHeading title="页面模板组件" description="以 Schema 组合完整 CRUD 页面和标签页，使用本地模拟服务演示交互。" />
-    <ShowcaseCard title="BestCrudPage" description="列表、查询、增删改查、行展开明细表和详情抽屉"><BestCrudPage schema={crudSchema} /></ShowcaseCard>
-    <ShowcaseCard title="Runtime 能力全量示例" description="Mock 演示行选择、批量动作、状态 Tab、查询折叠、工具栏、动态行操作和详情明细表"><BestCrudPage schema={capabilityCrudSchema} /></ShowcaseCard>
-    <ShowcaseCard title="BestTabbedPage" description="标签页中组合 CRUD 页面与注册 Slot"><BestTabbedPage schema={tabsSchema} /></ShowcaseCard>
+    <ShowcaseCard className="section-card-fixed-height" title="BestPage / BestCrudPage" description="统一 Provider 边界、列表、查询、增删改查、行展开明细表和详情抽屉"><BestPage layout="fill" registry={showcaseRegistry} schema={crudSchema} /></ShowcaseCard>
+    <ShowcaseCard title="Runtime 能力全量示例" description="Mock 演示业务筛选 Slot、行选择、批量动作、查询折叠、工具栏、动态行操作和详情明细表"><BestCrudPage schema={capabilityCrudSchema} /></ShowcaseCard>
+    <ShowcaseCard title="BestPage / BestTabbedPage" description="统一 Provider 边界、标签页中组合 CRUD 页面与注册 Slot"><BestPage layout="auto" registry={showcaseRegistry} schema={tabsSchema} /></ShowcaseCard>
   </section>
 }

@@ -50,15 +50,15 @@ const semanticCapabilities: RuntimeCapability[] = [
   {
     key: 'table.batchAction',
     label: '表格批量操作',
-    description: '在工具栏或页面操作中读取 selectedRowKeys、selectedRecords、query 和 activeTab 执行批量业务动作。',
+    description: '在工具栏或页面操作中读取 selectedRowKeys、selectedRecords 与 query 执行批量业务动作。',
     schemaPath: 'toolbar[].effect',
     example: { effect: 'runAction', action: 'transferToWms' }
   },
   {
-    key: 'table.statusTabs',
-    label: '状态 Tab 与查询联动',
-    description: '用状态页签切换列表查询条件，并让当前页签参与数据请求和操作上下文。',
-    schemaPath: 'table.statusTabs'
+    key: 'page.headerSlot',
+    label: '页面业务筛选 Slot',
+    description: '在查询区前后注入业务筛选控件；Slot 可读取并更新 Runtime 管理的 query 后刷新列表。',
+    schemaPath: 'header.beforeSearch / header.afterSearch'
   },
   {
     key: 'table.search.collapsible',
@@ -76,7 +76,7 @@ const semanticCapabilities: RuntimeCapability[] = [
   {
     key: 'table.actionVisibility',
     label: '行操作动态状态',
-    description: '根据当前行、查询条件或页签动态控制行操作的显示和禁用状态。',
+    description: '按 row、selection、query、detail 或 form 作用域动态控制行操作的显示和禁用状态。',
     schemaPath: 'table.actions[].visibleWhen / disabledWhen'
   },
   {

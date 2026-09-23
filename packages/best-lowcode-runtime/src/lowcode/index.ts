@@ -1,4 +1,6 @@
 export { createBestCrudAdapter, normalizeBestValues } from './adapter'
+export type { BestPageProps, BestPageSchema } from './BestPage'
+export { BestPage } from './BestPage'
 export type { BestCrudPageProps, CrudDataAdapter } from './BestCrudPage'
 export { BestCrudPage } from './BestCrudPage'
 export type { BestTabbedPageProps } from './BestTabbedPage'
@@ -22,7 +24,7 @@ export type {
   TableColumnSchema,
   TableExpandableSchema,
   TableRowSelectionSchema,
-  TableStatusTabSchema,
+  PageHeaderSlotSchema,
   TableToolbarSchema,
   TabContentSchema,
   TabbedPageSchema,
@@ -36,8 +38,10 @@ export {
 } from './schema'
 export type { SchemaDiagnostic, SchemaValidationResult } from './validate'
 export {
+  assertValidBestPageSchema,
   assertValidCrudPageSchema,
   assertValidTabbedPageSchema,
+  validateBestPageSchema,
   validateCrudPageSchema,
   validateTabbedPageSchema
 } from './validate'
