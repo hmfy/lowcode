@@ -712,11 +712,13 @@ export function BestCrudPage({ adapter, className, layout = 'fill', schema }: Be
 
     updateAvailableHeight()
     if (typeof ResizeObserver === 'undefined') return
+    // The available height belongs to the page layout, not to the table
+    // content. Observing the table region makes expanded rows feed their own
+    // height back into `scroll.y`, which can grow the scroll area indefinitely.
     const observer = new ResizeObserver(updateAvailableHeight)
     observer.observe(page)
-    observer.observe(tableRegion)
     return () => observer.disconnect()
-  }, [expandedRowKeys, layout, tableRecords.length])
+  }, [layout, tableRecords.length])
 
   useEffect(() => () => pageRequest.abort(), [pageRequest])
 
