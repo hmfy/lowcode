@@ -14,7 +14,7 @@ const spies = vi.hoisted(() => ({
   request: undefined as undefined | ((params: Record<string, unknown>) => Promise<unknown>),
   actionContext: undefined as undefined | Record<string, unknown>,
   tableProps: undefined as undefined | {
-    expandable?: { childrenColumnName?: string; defaultExpandAllRows?: boolean; indentSize?: number; expandedRowRender?: (record: Record<string, unknown>) => ReactNode }
+    expandable?: { childrenColumnName?: string; defaultExpandAllRows?: boolean; indentSize?: number; expandedRowKeys?: unknown[]; columnTitle?: ReactNode; onExpandedRowsChange?: (keys: unknown[]) => void; expandedRowRender?: (record: Record<string, unknown>) => ReactNode }
     rowSelection?: { type?: string; checkStrictly?: boolean; selectedRowKeys?: unknown[]; onChange?: (keys: unknown[], rows?: Record<string, unknown>[]) => void }
   }
 }))
@@ -26,6 +26,7 @@ vi.mock('antd', () => ({
     </button>
   ),
   ConfigProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+  Table: () => <div data-testid='detail-table' />,
   Modal: { confirm: spies.confirm },
   message: { error: spies.error, success: spies.success }
 }))
@@ -41,8 +42,10 @@ type TableColumn = {
 
 vi.mock('../src/ui', () => ({
   BestDetail: () => <div>详情</div>,
+  BestDrawer: ({ children, open }: { children: ReactNode; open: boolean }) =>
+    open ? <div data-testid='best-drawer'>{children}</div> : null,
   BestModal: ({ children, open }: { children: ReactNode; open: boolean }) =>
-    open ? <div>{children}</div> : null,
+    open ? <div data-testid='best-modal'>{children}</div> : null,
   BestForm: ({
     initialValues,
     onSubmit
@@ -82,7 +85,7 @@ vi.mock('../src/ui', () => ({
     columns: TableColumn[]
     request: (params: Record<string, unknown>) => Promise<unknown>
     toolBarRender?: () => ReactNode[]
-    expandable?: { childrenColumnName?: string; defaultExpandAllRows?: boolean; indentSize?: number; expandedRowRender?: (record: Record<string, unknown>) => ReactNode }
+    expandable?: { childrenColumnName?: string; defaultExpandAllRows?: boolean; indentSize?: number; expandedRowKeys?: unknown[]; columnTitle?: ReactNode; onExpandedRowsChange?: (keys: unknown[]) => void; expandedRowRender?: (record: Record<string, unknown>) => ReactNode }
     rowSelection?: { type?: string; checkStrictly?: boolean; selectedRowKeys?: unknown[]; onChange?: (keys: unknown[], rows?: Record<string, unknown>[]) => void }
   }) => {
     spies.request = request
@@ -105,6 +108,7 @@ vi.mock('../src/ui', () => ({
     return (
       <>
         {toolBarRender?.()}
+        {expandable?.columnTitle}
         {columns.map((column) => {
           const value =
             column.dataIndex && column.valueType === 'option'
@@ -182,6 +186,17 @@ afterEach(() => {
 })
 
 describe('BestCrudPage', () => {
+  it('uses a drawer when detail mode is omitted', async () => {
+    renderPage({
+      listServices: { 'customer.list': vi.fn().mockResolvedValue({ items: [], total: 0 }) },
+      services: { 'customer.create': vi.fn(), 'customer.update': vi.fn(), 'customer.remove': vi.fn() }
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: '新增' }))
+    expect(await screen.findByTestId('best-drawer')).toBeTruthy()
+    expect(screen.queryByTestId('best-modal')).toBeNull()
+  })
+
   it('passes nested-row expansion and parent-child selection configuration to BestTable', async () => {
     const pageSchema = {
       ...schema,
@@ -205,6 +220,10 @@ describe('BestCrudPage', () => {
       childrenColumnName: 'items',
       defaultExpandAllRows: true,
       defaultExpandedRowKeys: undefined,
+      expandedRowKeys: [],
+      columnTitle: undefined,
+      onExpandedRowsChange: expect.any(Function),
+      expandedRowRender: undefined,
       indentSize: 24
     }))
     expect(spies.tableProps?.rowSelection?.type).toBe('checkbox')
@@ -213,6 +232,39 @@ describe('BestCrudPage', () => {
 
     spies.tableProps?.rowSelection?.onChange?.(['parent', 'child'])
     await waitFor(() => expect(spies.tableProps?.rowSelection?.selectedRowKeys).toEqual(['parent', 'child']))
+  })
+
+  it('toggles all loaded expandable rows from the table header', async () => {
+    const pageSchema = {
+      ...schema,
+      table: {
+        ...schema.table,
+        expandable: {
+          dataField: 'detailList',
+          showExpandAll: true,
+          columns: [{ field: 'name', title: '明细' }]
+        }
+      }
+    } satisfies CrudPageSchema
+
+    renderSchemaPage(pageSchema, {
+      listServices: {
+        'customer.list': vi.fn().mockResolvedValue({ items: [{ id: 'customer-1' }], total: 1 })
+      },
+      services: {
+        'customer.create': vi.fn(),
+        'customer.update': vi.fn(),
+        'customer.remove': vi.fn()
+      }
+    })
+
+    await waitFor(() => expect(screen.getByRole('button', { name: '展开全部' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: '展开全部' }))
+    await waitFor(() => expect(spies.tableProps?.expandable?.expandedRowKeys).toEqual(['customer-1']))
+    expect(screen.getByRole('button', { name: '收起全部' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '收起全部' }))
+    await waitFor(() => expect(spies.tableProps?.expandable?.expandedRowKeys).toEqual([]))
   })
 
   it('passes status tabs and selected rows to actions', async () => {

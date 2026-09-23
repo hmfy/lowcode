@@ -39,27 +39,33 @@ is not evidence that an extension is required and never authorizes a handwritten
 2. Confirm the target project has `best-lowcode-runtime` in its dependencies. If it is missing,
    explain that the project must install it (for example `pnpm add best-lowcode-runtime`) and do
    not install it without the user's approval.
-3. Call `best_get_context(projectRoot)` and inspect the returned Config, Manifest, and Runtime capabilities.
-4. Run a capability audit. Select the complete set of relevant capability IDs declared in the
-   context and only target paths inside the returned allowlist; do not pass only the capabilities
-   initially suggested by the request.
-5. Call `best_validate_selection(projectRoot, request, relatedCapabilities, allowedPaths, targetPageDir)`.
+3. Call `best_get_capabilities()` without arguments once at the start of the audit. Treat its
+   returned list as the Runtime capability catalog. Match the natural-language request by meaning
+   to the exact `key` values in that catalog; do not invent IDs and do not use regex or code-based
+   keyword classification.
+4. Call `best_get_context(projectRoot)` and inspect the returned Config, project Manifest, and
+   Runtime capabilities. The catalog is the compact discovery source; read Runtime source only
+   when the catalog and validation leave an ambiguity.
+5. Run a capability audit. Select the complete set of relevant semantic capability keys from the
+   catalog, plus any required Manifest capability IDs, and only target paths inside the returned
+   allowlist; do not pass only the capabilities initially suggested by the request.
+6. Call `best_validate_selection(projectRoot, request, relatedCapabilities, allowedPaths, targetPageDir)`.
    For CRUD work, `targetPageDir` must be the explicit CRUD page directory selected by the Agent and
    must be inside `allowedPaths`; do not infer it from `request`, capability IDs, or directory naming
    conventions. If it is missing, let the validator return `selection.page.required`.
    If MCP is unavailable, run `<best-cli> validate-selection <request> --related-capabilities '<json-array>'
    --allowed-paths '<json-array>' --target-page-dir '<path>'`. Stop and ask the user if this returns
    diagnostics or `questions`.
-6. Before calling `best_preview_change`, write a Runtime coverage plan in the conversation. Include
+7. Before calling `best_preview_change`, write a Runtime coverage plan in the conversation. Include
    the Runtime owner for each page area and, for every non-native requirement, record the attempted
    Runtime capability, the corresponding Schema/API, the limitation, whether a Slot can satisfy it,
    and the selected fallback.
-7. Before changing a Schema or Manifest, call `best_preview_change`. Implement the returned
+8. Before changing a Schema or Manifest, call `best_preview_change`. Implement the returned
    `AgentTask`: the visible CRUD page must use `BestProvider` and `BestCrudPage`, with `schema.ts`,
    `adapter.ts`, `registry.ts`, `index.tsx`, and `slots/index.ts` for a new page. Feature-specific
    Runtime Slots belong under the page's `slots/` directory. If MCP is unavailable, run
    `<best-cli> preview-change <target-path> --candidate-file <path> --language <auto|ts|json>` instead.
-8. Call `best_verify`, then the `AgentTask.verificationCommands` and relevant project checks before
+9. Call `best_verify`, then the `AgentTask.verificationCommands` and relevant project checks before
    reporting completion. If MCP is unavailable, run `<best-cli> verify` instead.
 
 Never invent services, dictionaries, actions, slots, access rules, API parameters, or filesystem

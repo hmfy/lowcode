@@ -5,8 +5,9 @@ Before implementation, also read [runtime-implementation.md](runtime-implementat
 authoritative AI-only rule set for Runtime ownership, capability ordering, coverage statuses,
 fallback records, and verification.
 
-The MCP-first sequence is `best_get_context`, `best_validate_selection`,
+The MCP-first sequence is `best_get_capabilities`, `best_get_context`, `best_validate_selection`,
 `best_preview_change`, and `best_verify`. Every MCP call includes the absolute `projectRoot`.
+`best_get_capabilities` is the exception: it is a no-argument, Runtime-wide catalog lookup.
 When the MCP server cannot be used, CLI fallback is allowed only for its matching commands:
 `<best-cli> get-context`, `<best-cli> validate-selection`, `<best-cli> preview-change`, and
 `<best-cli> verify`. Use the platform-specific `<best-cli>` defined in the parent Skill; never use
@@ -15,6 +16,10 @@ a bare `best` command. State the MCP failure and fallback in the final result.
 If the matching CLI command is unavailable or cannot execute, stop immediately. Report the MCP and
 CLI failures to the user and request a repaired BEST toolchain; do not implement the feature with
 handwritten components, Ant Design, or an improvised local replacement.
+
+Call `best_get_capabilities()` before the audit. Use the returned exact capability keys and their
+descriptions as the semantic matching context for the Agent. The MCP tool is intentionally
+deterministic and does not classify natural language itself.
 
 Run a capability audit before validation. The audit must include every relevant native capability
 and classify each atomic requirement as `native-supported`, `slot-supported`,

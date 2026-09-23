@@ -5,6 +5,7 @@ import { isAbsolute, resolve } from 'node:path'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
 import { createBestLowcodeMcpService } from './service'
 import type { LowcodeAdapter } from './types'
+import { getRuntimeCapabilityManifest } from 'best-lowcode-runtime/dev'
 
 type ToolArgs = Record<string, unknown>
 
@@ -46,7 +47,7 @@ export function createBestLowcodeMcpServer(rootDir: string | undefined, adapter?
     return createBestLowcodeMcpService(projectRoot, adapter)
   }
   const server = new Server(
-    { name: 'best-lowcode-devtools', version: '0.2.12' },
+    { name: 'best-lowcode-devtools', version: '0.2.13' },
     { capabilities: { tools: {} } }
   )
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -75,6 +76,17 @@ export function createBestLowcodeMcpServer(rootDir: string | undefined, adapter?
           type: 'object',
           properties: { projectRoot: { type: 'string', description: '当前项目根目录（绝对路径）' } },
           required: rootDir ? [] : ['projectRoot'],
+          additionalProperties: false
+        }
+      },
+      {
+        name: 'best_get_capabilities',
+        description:
+          '读取 BEST Runtime 的完整能力清单。无参数调用；返回精确能力 key、使用场景、Schema 路径和可选示例，供 Agent 在自然语言需求审计时进行语义匹配。',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
           additionalProperties: false
         }
       },
@@ -175,6 +187,8 @@ export function createBestLowcodeMcpServer(rootDir: string | undefined, adapter?
       }
       case 'best_get_context':
         return textResult(await (await getService(args)).getContext())
+      case 'best_get_capabilities':
+        return textResult(adapter?.capabilities?.() ?? getRuntimeCapabilityManifest())
       case 'best_validate_selection': {
         const taskRequest = stringArg(args, 'request')
         const relatedCapabilities = stringArrayArg(args, 'relatedCapabilities')

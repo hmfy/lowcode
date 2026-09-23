@@ -141,6 +141,21 @@ export type ManifestDiscoveryResult = {
  */
 export type LowcodeAdapter = {
   builtInCapabilities?: () => string[]
+  capabilities?: () => RuntimeCapabilityManifest
   validateSchema?: (candidate: Record<string, unknown>) => Promise<Diagnostic[]> | Diagnostic[]
   verifyProject?: (rootDir: string) => Promise<Diagnostic[]> | Diagnostic[]
+}
+
+export type RuntimeCapability = {
+  key: string
+  label: string
+  description: string
+  schemaPath?: string
+  example?: Record<string, unknown>
+}
+
+export type RuntimeCapabilityManifest = {
+  runtime: string
+  version: number
+  capabilities: RuntimeCapability[]
 }

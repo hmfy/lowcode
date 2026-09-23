@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { CrudPageSchema, TabbedPageSchema } from '../src/lowcode/schema'
 import { TABBED_PAGE_SCHEMA_ID, TABBED_PAGE_SCHEMA_VERSION } from '../src/lowcode/schema'
 import {
+  getRuntimeCapabilityManifest,
   getBuiltinCapabilities,
   validateUnknownCrudPageSchema,
   validateUnknownPageSchema
@@ -42,6 +43,20 @@ describe('lowcode schema', () => {
   })
   it('exposes the remove effect as a built-in capability', () => {
     expect(getBuiltinCapabilities()).toContain('builtin.effect.remove')
+  })
+
+  it('publishes semantic Runtime capability metadata for Agent discovery', () => {
+    expect(getRuntimeCapabilityManifest()).toMatchObject({
+      runtime: 'best-lowcode-runtime',
+      version: 1
+    })
+    expect(getRuntimeCapabilityManifest().capabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'table.expandable', schemaPath: 'table.expandable' }),
+        expect.objectContaining({ key: 'table.rowSelection' }),
+        expect.objectContaining({ key: 'table.search.collapsible' })
+      ])
+    )
   })
 
   it('requires a registered remove service for a remove action', () => {
