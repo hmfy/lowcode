@@ -75,6 +75,8 @@ export type TableExpandableSchema = {
   childrenField?: string
   /** Render a separate detail table from this field instead of nested rows. */
   dataField?: string
+  /** Show a control in the expand column header to expand or collapse all loaded rows. */
+  showExpandAll?: boolean
   rowKey?: string
   columns?: TableColumnSchema[]
   defaultExpandAllRows?: boolean
@@ -208,6 +210,7 @@ export type CrudPageSchema = {
     columns?: number
   }
   detail?: {
+    /** Defaults to drawer when omitted. */
     mode?: 'drawer' | 'modal' | 'inline'
     width?: number | string
     columns?: number

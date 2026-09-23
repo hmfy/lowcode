@@ -102,9 +102,96 @@ const crudSchema: CrudPageSchema = {
   dataSource: { list: 'showcase.people', detail: 'showcase.detail', create: 'showcase.create', update: 'showcase.update', remove: 'showcase.remove' },
   search: [{ field: 'name', label: '姓名', component: 'input', placeholder: '搜索姓名' }, { field: 'team', label: '团队', component: 'select', dict: 'teams' }],
   form: [{ field: 'name', label: '姓名', component: 'input', required: true }, { field: 'team', label: '团队', component: 'select', dict: 'teams' }, { field: 'email', label: '邮箱', component: 'input', rules: [{ type: 'email', message: '请输入有效邮箱' }] }],
-  table: { rowKey: 'id', columns: [{ field: 'name', title: '姓名' }, { field: 'team', title: '团队' }, { field: 'email', title: '邮箱' }, { field: 'status', title: '状态', dict: 'status' }], actions: [{ id: 'detail', label: '详情', effect: 'openDetail' }, { id: 'edit', label: '编辑', effect: 'openEdit' }, { id: 'remove', label: '删除', effect: 'remove' }], pageSize: 5 },
+  table: {
+    rowKey: 'id',
+    columns: [{ field: 'name', title: '姓名', width: 140 }, { field: 'team', title: '团队', width: 120 }, { field: 'email', title: '邮箱', width: 240 }, { field: 'status', title: '状态', dict: 'status', width: 100 }],
+    expandable: {
+      dataField: 'detailList',
+      showExpandAll: true,
+      rowKey: 'id',
+      defaultExpandedRowKeys: ['U-1001'],
+      columns: [
+        { field: 'project', title: '项目', width: 260 },
+        { field: 'role', title: '职责', width: 180 },
+        { field: 'progress', title: '进度', width: 120 }
+      ]
+    },
+    actions: [{ id: 'detail', label: '详情', effect: 'openDetail' }, { id: 'edit', label: '编辑', effect: 'openEdit' }, { id: 'remove', label: '删除', effect: 'remove' }],
+    pageSize: 5
+  },
   toolbar: [{ id: 'create', label: '新增成员', effect: 'openCreate', buttonType: 'primary' }],
   detail: { mode: 'drawer', fields: [{ field: 'id', label: '员工编号' }, { field: 'name', label: '姓名' }, { field: 'team', label: '团队' }, { field: 'email', label: '邮箱' }, { field: 'status', label: '状态', dict: 'status' }] }
+}
+
+const capabilityCrudSchema: CrudPageSchema = {
+  $schema: CRUD_SCHEMA_ID, version: CRUD_SCHEMA_VERSION, id: 'ui-showcase-runtime-capabilities', kind: 'crud', title: 'Runtime 能力示例',
+  dataSource: { list: 'showcase.people', detail: 'showcase.detail', create: 'showcase.create', update: 'showcase.update', remove: 'showcase.remove' },
+  search: [
+    { field: 'name', label: '姓名', component: 'input', placeholder: '输入姓名' },
+    { field: 'team', label: '团队', component: 'select', dict: 'teams' },
+    { field: 'status', label: '状态', component: 'select', dict: 'status' },
+    { field: 'joinedAt', label: '入职日期', component: 'date' },
+    { field: 'budget', label: '年度预算', component: 'number' }
+  ],
+  searchConfig: { collapsible: true, defaultCollapsed: false, collapseAfter: 2 },
+  table: {
+    rowKey: 'id',
+    columns: [
+      { field: 'name', title: '姓名', width: 140 },
+      { field: 'team', title: '团队', width: 120 },
+      { field: 'status', title: '状态', dict: 'status', width: 100 },
+      { field: 'joinedAt', title: '入职日期', format: 'date', width: 140 },
+      { field: 'budget', title: '年度预算', format: 'money', width: 140 }
+    ],
+    statusTabs: {
+      field: 'status',
+      defaultKey: 'all',
+      items: [
+        { key: 'all', label: '全部', value: '' },
+        { key: 'active', label: '启用中', value: 'active', count: 3 },
+        { key: 'pending', label: '待审核', value: 'pending', count: 1 }
+      ]
+    },
+    rowSelection: { enabled: true, preserveSelectedRowKeys: true },
+    toolbar: {
+      refresh: true,
+      columnSettings: true,
+      exportAction: { id: 'export', label: '导出 Mock', effect: 'runAction', action: 'showcase.export' }
+    },
+    actions: [
+      { id: 'detail', label: '详情', effect: 'openDetail' },
+      { id: 'edit', label: '编辑', effect: 'openEdit', visibleWhen: { operator: 'equals', field: 'status', value: 'active' } },
+      { id: 'remove', label: '删除', effect: 'remove', disabledWhen: { operator: 'equals', field: 'status', value: 'pending' } }
+    ],
+    pageSize: 5
+  },
+  toolbar: [
+    { id: 'batchActivate', label: '批量设为启用', effect: 'runAction', action: 'showcase.batchActivate', buttonType: 'primary' }
+  ],
+  detail: {
+    mode: 'drawer',
+    fields: [
+      { field: 'id', label: '员工编号' },
+      { field: 'name', label: '姓名' },
+      { field: 'joinedAt', label: '入职日期', format: 'date' },
+      { field: 'budget', label: '年度预算', format: 'money' }
+    ],
+    sections: [{
+      key: 'projects',
+      title: '参与项目',
+      layout: 'table',
+      variant: 'card',
+      table: {
+        data: 'detailList',
+        rowKey: 'id',
+        columns: [
+          { field: 'project', title: '项目' },
+          { field: 'role', title: '职责' },
+          { field: 'progress', title: '进度' }
+        ]
+      }
+    }]
+  }
 }
 
 const tabsSchema: TabbedPageSchema = {
@@ -117,7 +204,8 @@ const tabsSchema: TabbedPageSchema = {
 
 export function PagesShowcasePage() {
   return <section><ShowcaseHeading title="页面模板组件" description="以 Schema 组合完整 CRUD 页面和标签页，使用本地模拟服务演示交互。" />
-    <ShowcaseCard title="BestCrudPage" description="列表、查询、增删改查和详情抽屉"><BestCrudPage schema={crudSchema} /></ShowcaseCard>
+    <ShowcaseCard title="BestCrudPage" description="列表、查询、增删改查、行展开明细表和详情抽屉"><BestCrudPage schema={crudSchema} /></ShowcaseCard>
+    <ShowcaseCard title="Runtime 能力全量示例" description="Mock 演示行选择、批量动作、状态 Tab、查询折叠、工具栏、动态行操作和详情明细表"><BestCrudPage schema={capabilityCrudSchema} /></ShowcaseCard>
     <ShowcaseCard title="BestTabbedPage" description="标签页中组合 CRUD 页面与注册 Slot"><BestTabbedPage schema={tabsSchema} /></ShowcaseCard>
   </section>
 }

@@ -32,6 +32,7 @@ const semanticCapabilities: RuntimeCapability[] = [
     schemaPath: 'table.expandable',
     example: {
       dataField: 'detailList',
+      showExpandAll: true,
       rowKey: 'skuCode',
       columns: [
         { field: 'skuCode', title: 'SKU编码' },

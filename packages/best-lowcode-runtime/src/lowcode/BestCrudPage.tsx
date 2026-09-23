@@ -1,7 +1,7 @@
 import type { ActionType } from '@ant-design/pro-components'
 import { Button, Modal, message } from 'antd'
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Key } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Key, type ReactNode } from 'react'
 import { useBestListService, useBestRegistry } from '../runtime'
 import {
   BestDetail,
@@ -272,6 +272,54 @@ function toTableColumn(
   }
 }
 
+function InlineDetailTable({
+  columns,
+  data,
+  rowKey
+}: {
+  columns: BestTableColumn<RecordValue>[]
+  data: RecordValue[]
+  rowKey: string
+}) {
+  return (
+    <div className='best-lowcode-detail-table'>
+      <table className='best-lowcode-detail-table-grid'>
+        <colgroup>
+          {columns.map((column, index) => (
+            <col key={`${String(column.key ?? column.dataIndex ?? 'column')}-${index}`} style={column.width ? { width: column.width } : undefined} />
+          ))}
+        </colgroup>
+        <thead>
+          <tr>
+            {columns.map((column, index) => (
+              <th key={`${String(column.key ?? column.dataIndex ?? 'column')}-${index}`}>
+                {typeof column.title === 'function' ? '' : column.title}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((record, rowIndex) => (
+            <tr key={String(record[rowKey] ?? rowIndex)}>
+              {columns.map((column, columnIndex) => {
+                const field = Array.isArray(column.dataIndex) ? column.dataIndex.join('.') : column.dataIndex
+                const value = field ? getPathValue(record, String(field)) : undefined
+                const render = column.render as ((value: unknown, row: RecordValue, index: number) => ReactNode) | undefined
+                const renderText = column.renderText as ((value: unknown, row: RecordValue, index: number) => ReactNode) | undefined
+                return (
+                  <td key={`${String(column.key ?? field ?? 'column')}-${columnIndex}`}>
+                    {render?.(value, record, rowIndex) ?? renderText?.(value, record, rowIndex) ?? (value == null || value === '' ? '-' : String(value))}
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 function toProTableSearchColumn(
   field: FieldSchema,
   dictionary: Record<string, { label: string; value: string | number }[]>
@@ -374,6 +422,11 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
   const detailRequestRef = useRef<AbortController | undefined>(undefined)
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
+  const [tableRecords, setTableRecords] = useState<RecordValue[]>([])
+  const [expandedRowKeys, setExpandedRowKeys] = useState<Key[]>(
+    schema.table.expandable?.defaultExpandedRowKeys ?? []
+  )
+  const expansionInitializedRef = useRef(false)
   const defaultStatusTab = schema.table.statusTabs?.defaultKey ?? schema.table.statusTabs?.items[0]?.key
   const [activeTab, setActiveTab] = useState(defaultStatusTab)
   const activeTabRef = useRef(activeTab)
@@ -396,6 +449,12 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
     selectedRowKeysRef.current = []
     selectedRecordsRef.current = []
   }, [schema.id, schema.table.statusTabs])
+
+  useEffect(() => {
+    expansionInitializedRef.current = false
+    setTableRecords([])
+    setExpandedRowKeys(schema.table.expandable?.defaultExpandedRowKeys ?? [])
+  }, [schema.id, schema.table.expandable?.defaultExpandedRowKeys])
 
   const handleAction = useCallback(
     async (action: PageActionSchema, record?: RecordValue) => {
@@ -552,8 +611,8 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
   )
   const rowKey = schema.table.rowKey
   const request = useCallback(
-    (params: RecordValue, sort?: Record<string, unknown>) =>
-      pageRequest.request(
+    async (params: RecordValue, sort?: Record<string, unknown>) => {
+      const response = await pageRequest.request(
         toBestListQuery(
           {
             ...params,
@@ -568,8 +627,17 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
           },
           sort
         )
-      ),
-    [pageRequest, schema.table.statusTabs, useBestSearch]
+      )
+      setTableRecords(response.data)
+      if (!expansionInitializedRef.current) {
+        expansionInitializedRef.current = true
+        if (schema.table.expandable?.defaultExpandAllRows) {
+          setExpandedRowKeys(response.data.map(rowKeyOf))
+        }
+      }
+      return response
+    },
+    [pageRequest, rowKeyOf, schema.table.expandable?.defaultExpandAllRows, schema.table.statusTabs, useBestSearch]
   )
 
   const expandedColumns = useMemo(
@@ -594,6 +662,13 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
 
   const toolbarOptions = schema.table.toolbar
   const statusTabs = schema.table.statusTabs
+  const expandableSchema = schema.table.expandable
+  const detailMode = schema.detail?.mode ?? 'drawer'
+  const expandableKeys = useMemo(() => tableRecords.map(rowKeyOf), [rowKeyOf, tableRecords])
+  const allRowsExpanded = expandableKeys.length > 0 && expandableKeys.every((key) => expandedRowKeys.includes(key))
+  const toggleAllRows = useCallback(() => {
+    setExpandedRowKeys(allRowsExpanded ? [] : expandableKeys)
+  }, [allRowsExpanded, expandableKeys])
   const proTableSearch = useMemo(() => {
     if (useBestSearch || !schema.searchConfig?.collapsible) return undefined
     return {
@@ -729,23 +804,26 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
             ? (record) => rowKey.map((field) => String(record[field] ?? '')).join('-')
             : rowKey
         }
-        expandable={schema.table.expandable ? {
-          childrenColumnName: schema.table.expandable.childrenField ?? 'children',
-          defaultExpandAllRows: schema.table.expandable.defaultExpandAllRows,
-          defaultExpandedRowKeys: schema.table.expandable.defaultExpandedRowKeys,
-          indentSize: schema.table.expandable.indentSize,
-          expandedRowRender: schema.table.expandable.dataField && expandedColumns
+        expandable={expandableSchema ? {
+          childrenColumnName: expandableSchema.childrenField ?? 'children',
+          defaultExpandAllRows: expandableSchema.defaultExpandAllRows,
+          defaultExpandedRowKeys: expandableSchema.defaultExpandedRowKeys,
+          expandedRowKeys,
+          onExpandedRowsChange: (keys) => setExpandedRowKeys(Array.from(keys)),
+          columnTitle: expandableSchema.showExpandAll ? (
+            <Button type='link' size='small' onClick={toggleAllRows}>
+              {allRowsExpanded ? '收起全部' : '展开全部'}
+            </Button>
+          ) : undefined,
+          indentSize: expandableSchema.indentSize,
+          expandedRowRender: expandableSchema.dataField && expandedColumns
             ? (record) => {
-                const details = record[schema.table.expandable?.dataField ?? '']
+                const details = record[expandableSchema.dataField ?? '']
                 return (
-                  <BestTable<RecordValue, RecordValue>
+                  <InlineDetailTable
                     columns={expandedColumns}
-                    dataSource={Array.isArray(details) ? details.filter(isRecord) : []}
-                    rowKey={schema.table.expandable?.rowKey ?? 'id'}
-                    pagination={false}
-                    search={false}
-                    options={false}
-                    cardProps={false}
+                    data={Array.isArray(details) ? details.filter(isRecord) : []}
+                    rowKey={expandableSchema.rowKey ?? 'id'}
                   />
                 )
               }
@@ -773,20 +851,20 @@ export function BestCrudPage({ adapter, className, schema }: BestCrudPageProps) 
           ] : [])
         ]}
       />
-      {drawer.mode === 'detail' && schema.detail?.mode === 'inline' ? (
+      {drawer.mode === 'detail' && detailMode === 'inline' ? (
         <DetailContent state={detailState} record={drawer.record} />
       ) : null}
-      {drawer.mode !== 'closed' && (schema.detail?.mode !== 'inline' || drawer.mode !== 'detail') && schema.detail?.mode === 'drawer' ? <BestDrawer
+      {drawer.mode !== 'closed' && (detailMode !== 'inline' || drawer.mode !== 'detail') && detailMode === 'drawer' ? <BestDrawer
         open
-        width={schema.detail.width}
+        width={schema.detail?.width}
         title={drawer.mode === 'detail' ? `${schema.title}详情` : drawer.mode === 'edit' ? `编辑${schema.title}` : `新建${schema.title}`}
-        footer={drawer.mode === 'detail' && schema.detail.footer?.length ? <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>{schema.detail.footer.map((action) => <ActionButton action={action} key={action.id} record={drawer.record} onExecute={handleAction} />)}</div> : undefined}
+        footer={drawer.mode === 'detail' && schema.detail?.footer?.length ? <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>{schema.detail.footer.map((action) => <ActionButton action={action} key={action.id} record={drawer.record} onExecute={handleAction} />)}</div> : undefined}
         onClose={() => { detailRequestRef.current?.abort(); setDrawer({ mode: 'closed' }); setDetailState({ loading: false }) }}
       >
         {drawer.mode === 'detail' ? <DetailContent state={detailState} record={drawer.record} /> : null}
         {drawer.mode === 'edit' || drawer.mode === 'create' ? <BestForm fields={formFields} initialValues={drawer.record} loading={submitting} mode={drawer.mode as FormMode} onCancel={() => setDrawer({ mode: 'closed' })} onSubmit={(values) => { void submitForm(values) }} /> : null}
       </BestDrawer> : null}
-      {drawer.mode !== 'closed' && (schema.detail?.mode !== 'inline' || drawer.mode !== 'detail') && schema.detail?.mode !== 'drawer' ? <BestModal
+      {drawer.mode !== 'closed' && (detailMode !== 'inline' || drawer.mode !== 'detail') && detailMode === 'modal' ? <BestModal
         open
         title={
           drawer.mode === 'detail'
