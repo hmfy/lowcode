@@ -12,17 +12,31 @@ export type BestPageProps = {
   className?: string
   /** Standard full-page host: the table body receives the height left by page controls. */
   layout?: 'auto' | 'fill'
+  /** Explicit table body height. Runtime falls back to 480px if a JS caller omits it. */
+  tableHeight: number
   schema: BestPageSchema
   registry?: Parameters<typeof BestProvider>[0]['registry']
   theme?: Parameters<typeof BestProvider>[0]['theme']
   adapter?: CrudDataAdapter
 }
 
-function BestPageContent({ className, layout, schema, adapter }: Omit<BestPageProps, 'registry' | 'theme'>) {
+const DEFAULT_TABLE_HEIGHT = 480
+
+function BestPageContent({ className, layout, tableHeight, schema, adapter }: Omit<BestPageProps, 'registry' | 'theme'>) {
   const registry = useBestRegistry()
   assertValidBestPageSchema(schema, registry)
   if (schema.kind === 'tabs') return <BestTabbedPage className={className} schema={schema} />
-  return <BestCrudPage className={className} layout={layout} schema={schema} adapter={adapter} />
+  const resolvedTableHeight =
+    tableHeight ?? schema.table.scrollY ?? DEFAULT_TABLE_HEIGHT
+  return (
+    <BestCrudPage
+      className={className}
+      layout={layout}
+      tableHeight={resolvedTableHeight}
+      schema={schema}
+      adapter={adapter}
+    />
+  )
 }
 
 /**

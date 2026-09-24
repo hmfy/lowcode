@@ -45,6 +45,8 @@ type BestCrudPageProps = {
   className?: string
   /** `fill` consumes the bounded Runtime page host and gives the table its remaining height. */
   layout?: 'auto' | 'fill'
+  /** Explicit table body height supplied by the public BestPage entry point. */
+  tableHeight?: number
   schema: CrudPageSchema
   adapter?: CrudDataAdapter
 }
@@ -363,7 +365,7 @@ function confirmAction(content: string) {
   })
 }
 
-export function BestCrudPage({ adapter, className, layout = 'fill', schema }: BestCrudPageProps) {
+export function BestCrudPage({ adapter, className, layout = 'fill', tableHeight, schema }: BestCrudPageProps) {
   const registry = useBestRegistry()
   assertValidCrudPageSchema(schema, registry)
   const registeredListService = useBestListService(schema.dataSource.list)
@@ -862,11 +864,13 @@ export function BestCrudPage({ adapter, className, layout = 'fill', schema }: Be
         search={useBestSearch ? false : proTableSearch}
         scroll={{
           ...(schema.table.scrollX ? { x: schema.table.scrollX } : {}),
-          ...(schema.table.scrollY !== undefined
-            ? { y: schema.table.scrollY }
-            : layout === 'fill' && availableTableScrollHeight
-              ? { y: availableTableScrollHeight }
-              : {})
+          ...(tableHeight !== undefined
+            ? { y: tableHeight }
+            : schema.table.scrollY !== undefined
+              ? { y: schema.table.scrollY }
+              : layout === 'fill' && availableTableScrollHeight
+                ? { y: availableTableScrollHeight }
+                : {})
         }}
         toolBarRender={() => [
           ...(schema.toolbar?.map((action) => (
