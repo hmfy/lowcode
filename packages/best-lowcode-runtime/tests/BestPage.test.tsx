@@ -3,10 +3,10 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { useBestDictionary } from '../src/runtime'
 
-const crudPageProps = vi.hoisted(() => ({ current: undefined as { tableHeight?: number } | undefined }))
+const crudPageProps = vi.hoisted(() => ({ current: undefined as { tableHeight: number } | undefined }))
 
 vi.mock('../src/lowcode/BestCrudPage', () => ({
-  BestCrudPage: (props: { tableHeight?: number }) => {
+  BestCrudPage: (props: { tableHeight: number }) => {
     crudPageProps.current = props
     return <div>{useBestDictionary('first-mount.status')[0]?.label}</div>
   }
@@ -49,21 +49,16 @@ describe('BestPage', () => {
     expect(crudPageProps.current?.tableHeight).toBe(640)
   })
 
-  it('keeps schema scrollY as the compatibility fallback', () => {
-    render(
-      <BestPage
-        schema={{ ...schema, table: { ...schema.table, scrollY: 520 } }}
-        tableHeight={undefined as never}
-        registry={registry}
-      />
-    )
+  it('accepts a changed table height value', () => {
+    const { rerender } = render(<BestPage schema={schema} tableHeight={480} registry={registry} />)
+    rerender(<BestPage schema={schema} tableHeight={720} registry={registry} />)
 
-    expect(crudPageProps.current?.tableHeight).toBe(520)
+    expect(crudPageProps.current?.tableHeight).toBe(720)
   })
 
-  it('keeps the runtime default when a non-TypeScript caller omits the prop', () => {
-    render(<BestPage schema={schema} tableHeight={undefined as never} registry={registry} />)
-
-    expect(crudPageProps.current?.tableHeight).toBe(480)
+  it('rejects an invalid table height', () => {
+    expect(() =>
+      render(<BestPage schema={schema} tableHeight={0} registry={registry} />)
+    ).toThrow('BestPage requires a positive finite tableHeight')
   })
 })

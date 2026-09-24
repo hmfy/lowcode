@@ -35,7 +35,8 @@ const schema = {
 } satisfies CrudPageSchema
 
 export function CustomerPage() {
-  return <BestPage registry={{ services: { 'customer.list': async () => ({ list: [], total: 0 }) } }} schema={schema} />
+  const tableHeight = 480 // 由业务页面根据实际容器布局计算，可使用 React state 动态更新
+  return <BestPage tableHeight={tableHeight} registry={{ services: { 'customer.list': async () => ({ list: [], total: 0 }) } }} schema={schema} />
 }
 ```
 

@@ -7,10 +7,11 @@ import { assertValidTabbedPageSchema } from './validate'
 export type BestTabbedPageProps = {
   className?: string
   schema: TabbedPageSchema
+  tableHeight: number
 }
 
 /** Renders declarative tabs whose contents are either a CRUD schema or a registered slot. */
-export function BestTabbedPage({ className, schema }: BestTabbedPageProps) {
+export function BestTabbedPage({ className, schema, tableHeight }: BestTabbedPageProps) {
   const registry = useBestRegistry()
   assertValidTabbedPageSchema(schema, registry)
   const items = schema.tabs
@@ -21,7 +22,7 @@ export function BestTabbedPage({ className, schema }: BestTabbedPageProps) {
       destroyOnHidden: tab.destroyOnHidden,
       children:
         tab.content.type === 'crud' ? (
-          <BestCrudPage schema={tab.content.schema} />
+          <BestCrudPage schema={tab.content.schema} tableHeight={tableHeight} />
         ) : (
           registry.slots[tab.content.slot]?.({ pageId: schema.id, tabKey: tab.key }) ?? null
         )
