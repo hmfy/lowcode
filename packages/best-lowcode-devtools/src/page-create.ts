@@ -1,4 +1,4 @@
-import { access, mkdir, writeFile } from 'node:fs/promises'
+import { access, mkdir, unlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import {
   type Diagnostic,
@@ -343,8 +343,27 @@ export async function createPage(
   }
   await mkdir(resolvedTarget, { recursive: true })
   await Promise.all(files.map((file) => mkdir(dirname(resolve(rootDir, file.path)), { recursive: true })))
-  await Promise.all(
-    files.map((file) => writeFile(resolve(rootDir, file.path), file.content, 'utf8'))
-  )
+
+  // Keep the Runtime entrypoint disabled until the schema, adapter, registry
+  // and feature slots are all present. This prevents a dev server from
+  // hot-reloading BestPage against an incomplete registry during scaffolding.
+  const entryFile = files.find((file) => file.path.endsWith('/index.tsx'))
+  const preparationFiles = files.filter((file) => file !== entryFile)
+  const writtenPaths: string[] = []
+  try {
+    for (const file of preparationFiles) {
+      const absolutePath = resolve(rootDir, file.path)
+      await writeFile(absolutePath, file.content, { encoding: 'utf8', flag: 'wx' })
+      writtenPaths.push(absolutePath)
+    }
+    if (entryFile) {
+      const absolutePath = resolve(rootDir, entryFile.path)
+      await writeFile(absolutePath, entryFile.content, { encoding: 'utf8', flag: 'wx' })
+      writtenPaths.push(absolutePath)
+    }
+  } catch (error) {
+    await Promise.all(writtenPaths.map((path) => unlink(path).catch(() => undefined)))
+    throw error
+  }
   return { written: true, pageName: options.name, targetDir, files, diagnostics }
 }

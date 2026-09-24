@@ -3,7 +3,7 @@ import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, relative, resolve, sep } from 'node:path'
 import ts from 'typescript'
 import { resolveAllowedPath } from './config'
-import { diagnostic } from './diagnostics'
+import { diagnostic, hasErrors } from './diagnostics'
 import { parseCapabilityManifest } from './manifest'
 import type {
   CapabilityManifest,
@@ -121,7 +121,7 @@ function collectSchemaReferences(
     if (typeof child === 'string') {
       if (
         parentKey === 'dataSource' &&
-        (key === 'list' || key === 'detail' || key === 'create' || key === 'update')
+        (key === 'list' || key === 'detail' || key === 'create' || key === 'update' || key === 'remove')
       ) {
         capabilities.services.add(child)
       } else if (key === 'dict') capabilities.dictionaries.add(child)
@@ -407,7 +407,7 @@ export async function syncManifestDiscovery(
         if (!registry[kind].has(id)) {
           diagnostics.push(
             diagnostic(
-              'warning',
+              'error',
               'manifest.sync.registry.missing',
               `Schema 引用了未在同页 registry 中发现的 ${kind}：${id}`,
               relative(rootDir, schemaPath).split(sep).join('/')
@@ -422,9 +422,11 @@ export async function syncManifestDiscovery(
   const after = hasManifestAdditions(existing, discovered)
     ? `${JSON.stringify(mergeManifest(existing, discovered), null, 2)}\n`
     : before
-  if (write && before !== after) await writeFile(absoluteManifestPath, after)
+  if (write && before !== after && !hasErrors(diagnostics)) {
+    await writeFile(absoluteManifestPath, after)
+  }
   return {
-    written: write && before !== after,
+    written: write && before !== after && !hasErrors(diagnostics),
     pages: [...new Set(pages)].sort(),
     preview: { targetPath: manifestPath, exists: true, diff: { before, after }, diagnostics },
     diagnostics

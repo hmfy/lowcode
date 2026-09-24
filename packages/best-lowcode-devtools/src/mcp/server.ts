@@ -6,6 +6,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 import { createBestLowcodeMcpService } from './service'
 import type { LowcodeAdapter } from './types'
 import { getRuntimeCapabilityManifest } from 'best-lowcode-runtime/dev'
+import packageJson from '../../package.json' with { type: 'json' }
 
 type ToolArgs = Record<string, unknown>
 
@@ -47,7 +48,7 @@ export function createBestLowcodeMcpServer(rootDir: string | undefined, adapter?
     return createBestLowcodeMcpService(projectRoot, adapter)
   }
   const server = new Server(
-    { name: 'best-lowcode-devtools', version: '0.2.13' },
+    { name: 'best-lowcode-devtools', version: packageJson.version },
     { capabilities: { tools: {} } }
   )
   server.setRequestHandler(ListToolsRequestSchema, async () => ({

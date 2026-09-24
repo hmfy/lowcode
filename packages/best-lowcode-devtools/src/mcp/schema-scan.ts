@@ -76,6 +76,7 @@ type RegistryKeyBindings = {
   dictionaries: Map<string, ts.Expression>
   actions: Map<string, ts.Expression>
   slots: Map<string, ts.Expression>
+  dynamicGroups: Set<RegistryRuntimeGroup>
 }
 
 type RegistryServiceGroup = 'listServices' | 'services'
@@ -260,7 +261,8 @@ function registryKeyBindings(
     services: new Map(),
     dictionaries: new Map(),
     actions: new Map(),
-    slots: new Map()
+    slots: new Map(),
+    dynamicGroups: new Set()
   }
   function collectMappings(value: ts.Expression) {
     value = unwrapExpression(value)
@@ -270,8 +272,18 @@ function registryKeyBindings(
       if (!ts.isPropertyAssignment(property)) continue
       const group = property.name.getText()
       const mappings = unwrapExpression(property.initializer)
-      if (!(groups as readonly string[]).includes(group) || !ts.isObjectLiteralExpression(mappings)) continue
+      if (!(groups as readonly string[]).includes(group)) continue
       const typedGroup = group as (typeof groups)[number]
+      if (
+        typedGroup === 'slots' &&
+        ts.isCallExpression(mappings) &&
+        ts.isIdentifier(mappings.expression) &&
+        mappings.expression.text === 'createBestSlotRegistry'
+      ) {
+        bindings.dynamicGroups.add('slots')
+        continue
+      }
+      if (!ts.isObjectLiteralExpression(mappings)) continue
       for (const mapping of mappings.properties) {
         if (!ts.isPropertyAssignment(mapping)) continue
         const key = ts.isIdentifier(mapping.name) || ts.isStringLiteral(mapping.name)
@@ -399,7 +411,6 @@ function validateRegistryRuntimeReferences(
   registryContent: string,
   registryPath: string,
   registryBindings: Set<string>,
-  capabilityIds: Set<string>,
   diagnostics: Diagnostic[],
   relativePath: string
 ) {
@@ -421,10 +432,9 @@ function validateRegistryRuntimeReferences(
   for (const registryBinding of registryBindings) {
     const mappings = registryKeyBindings(registryContent, registryPath, registryBinding)
     for (const reference of references) {
-      if (capabilityIds.has(reference.id)) continue
       // Slot registries may be composed from ./slots through a helper; that
       // source is checked separately by validateFeatureSlotOrganization.
-      if (reference.group === 'slots' && mappings.slots.size === 0) continue
+      if (reference.group === 'slots' && mappings.dynamicGroups.has('slots')) continue
       if (!mappings[reference.group].has(reference.id)) {
         diagnostics.push(
           diagnostic(
@@ -845,7 +855,6 @@ export async function scanTypeScriptSchemas(
           registryContent,
           registryPath,
           indexBindings.registryBindings,
-          capabilityIds,
           diagnostics,
           relativePath
         )

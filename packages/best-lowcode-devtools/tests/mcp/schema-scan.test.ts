@@ -29,11 +29,19 @@ async function createProject(schema: string) {
   await writeFile(join(root, 'apps/rps/src/pages/client-ledger/schema.ts'), schema)
   await writeFile(
     join(root, 'apps/rps/src/pages/client-ledger/registry.ts'),
-    `import { listClientLedger, viewTransactions } from './adapter'
+    `import { createBestSlotRegistry } from 'best-lowcode-runtime'
+import { listClientLedger, viewTransactions } from './adapter'
+import { clientLedgerSlots } from './slots'
 export const clientLedgerRegistry = {
   listServices: { 'rps.client-ledger.list': listClientLedger },
-  actions: { 'rps.client-ledger.view-transactions': viewTransactions }
+  dictionaries: { 'rps.client-ledger.currency': [] },
+  actions: { 'rps.client-ledger.view-transactions': viewTransactions },
+  slots: createBestSlotRegistry(clientLedgerSlots)
 }\n`
+  )
+  await writeFile(
+    join(root, 'apps/rps/src/pages/client-ledger/slots.ts'),
+    `export const clientLedgerSlots = { 'rps.client-ledger.amount': () => null }\n`
   )
   await writeFile(
     join(root, 'apps/rps/src/pages/client-ledger/adapter.ts'),
@@ -136,14 +144,69 @@ describe('TypeScript schema verification', () => {
     )
   })
 
-  it('accepts schema references registered in Manifest or built-ins', async () => {
-    const service = createBestLowcodeMcpService(
-      await createProject(
-        schemaWith("toolbar: [{ id: 'create', label: '新增', effect: 'openCreate' }]")
-      ),
-      bestLowcodeAdapter
+  it('rejects a dictionary reference that exists only in the Manifest', async () => {
+    const root = await createProject(
+      schemaWith("toolbar: [{ id: 'create', label: '新增', effect: 'openCreate' }]")
     )
-    await expect(service.verify()).resolves.toMatchObject({ ok: true, diagnostics: [] })
+    await writeFile(
+      join(root, 'apps/rps/src/pages/client-ledger/registry.ts'),
+      `import { listClientLedger, viewTransactions } from './adapter'
+export const clientLedgerRegistry = {
+  listServices: { 'rps.client-ledger.list': listClientLedger },
+  actions: { 'rps.client-ledger.view-transactions': viewTransactions }
+}\n`
+    )
+    const service = createBestLowcodeMcpService(root, bestLowcodeAdapter)
+    const result = await service.verify()
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: 'architecture.registry.reference.missing',
+        message: 'Schema dictionaries 引用 rps.client-ledger.currency，但 registry.dictionaries 未注册。'
+      })
+    )
+  })
+
+  it('accepts a dictionary reference registered by the page registry', async () => {
+    const root = await createProject(
+      schemaWith("toolbar: [{ id: 'create', label: '新增', effect: 'openCreate' }]")
+    )
+    await writeFile(
+      join(root, 'apps/rps/src/pages/client-ledger/registry.ts'),
+      `import { createBestSlotRegistry } from 'best-lowcode-runtime'
+import { listClientLedger, viewTransactions } from './adapter'
+import { clientLedgerSlots } from './slots'
+export const clientLedgerRegistry = {
+  listServices: { 'rps.client-ledger.list': listClientLedger },
+  dictionaries: { 'rps.client-ledger.currency': [] },
+  actions: { 'rps.client-ledger.view-transactions': viewTransactions },
+  slots: createBestSlotRegistry(clientLedgerSlots)
+}\n`
+    )
+    const result = await createBestLowcodeMcpService(root, bestLowcodeAdapter).verify()
+    expect(result.ok).toBe(true)
+    expect(result.diagnostics).toEqual([])
+  })
+
+  it('rejects a slot reference when the page registry has no slots group', async () => {
+    const root = await createProject(schemaWith(''))
+    await writeFile(
+      join(root, 'apps/rps/src/pages/client-ledger/registry.ts'),
+      `import { listClientLedger, viewTransactions } from './adapter'
+export const clientLedgerRegistry = {
+  listServices: { 'rps.client-ledger.list': listClientLedger },
+  dictionaries: { 'rps.client-ledger.currency': [] },
+  actions: { 'rps.client-ledger.view-transactions': viewTransactions }
+}\n`
+    )
+    const result = await createBestLowcodeMcpService(root, bestLowcodeAdapter).verify()
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: 'architecture.registry.reference.missing',
+        message: 'Schema slots 引用 rps.client-ledger.amount，但 registry.slots 未注册。'
+      })
+    )
   })
 
   it('reports fields missing from a list service output contract', async () => {
