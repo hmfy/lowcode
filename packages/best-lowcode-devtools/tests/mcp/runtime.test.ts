@@ -14,7 +14,7 @@ describe('project runtime diagnostics', () => {
     await expect(checkProjectRuntime(root)).resolves.toEqual([
       expect.objectContaining({
         code: 'runtime.missing',
-        recovery: expect.objectContaining({ command: 'pnpm add best-lowcode-runtime' })
+        recovery: expect.objectContaining({ command: 'pnpm add best-lowcode-runtime@latest' })
       })
     ])
   })
@@ -28,6 +28,18 @@ describe('project runtime diagnostics', () => {
     )
 
     await expect(checkProjectRuntime(root)).resolves.toEqual([])
+  })
+
+  it('suggests the latest Runtime when the project has not declared one', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'best-lowcode-runtime-'))
+    await writeFile(join(root, 'package.json'), JSON.stringify({ packageManager: 'npm@10.0.0' }))
+
+    await expect(checkProjectRuntime(root)).resolves.toEqual([
+      expect.objectContaining({
+        code: 'runtime.missing',
+        recovery: expect.objectContaining({ command: 'npm install best-lowcode-runtime@latest' })
+      })
+    ])
   })
 
   it('accepts a Runtime declared by an app package below an allowed path', async () => {

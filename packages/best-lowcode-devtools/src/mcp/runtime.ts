@@ -139,7 +139,7 @@ export async function checkProjectRuntime(
       `当前项目未声明 ${RUNTIME_PACKAGE}；请在 ${rootDir} 安装项目依赖后重试。`,
       rootDir,
       {
-        command: await installCommand(rootDir, rootDir, [RUNTIME_PACKAGE]),
+        command: await installCommand(rootDir, rootDir, [`${RUNTIME_PACKAGE}@latest`]),
         requiresUserApproval: true,
         retryTool: 'best_get_context'
       }

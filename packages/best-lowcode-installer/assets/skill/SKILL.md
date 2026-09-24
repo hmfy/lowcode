@@ -37,7 +37,8 @@ is not evidence that an extension is required and never authorizes a handwritten
    obtain confirmation before repeating the call with `write: true`. If MCP is unavailable, use
    `<best-cli> init` with the same JSON-array options, preview first, then use `--write` after approval.
 2. Confirm the target project has `best-lowcode-runtime` in its dependencies. If it is missing,
-   explain that the project must install it (for example `pnpm add best-lowcode-runtime`) and do
+   explain that the project must install it (for example `pnpm add best-lowcode-runtime@latest`; use
+   an explicitly requested version when the user specifies one) and do
    not install it without the user's approval.
 3. Call `best_get_capabilities()` without arguments once at the start of the audit. Treat its
    returned list as the Runtime capability catalog. Match the natural-language request by meaning
