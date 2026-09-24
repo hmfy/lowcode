@@ -43,10 +43,8 @@ type RecordValue = Record<string, unknown>
 
 type BestCrudPageProps = {
   className?: string
-  /** `fill` consumes the bounded Runtime page host and gives the table its remaining height. */
-  layout?: 'auto' | 'fill'
-  /** Explicit table body height supplied by the public BestPage entry point. */
-  tableHeight?: number
+  /** Business-owned table body height. */
+  tableHeight: number
   schema: CrudPageSchema
   adapter?: CrudDataAdapter
 }
@@ -365,7 +363,7 @@ function confirmAction(content: string) {
   })
 }
 
-export function BestCrudPage({ adapter, className, layout = 'fill', tableHeight, schema }: BestCrudPageProps) {
+export function BestCrudPage({ adapter, className, tableHeight, schema }: BestCrudPageProps) {
   const registry = useBestRegistry()
   assertValidCrudPageSchema(schema, registry)
   const registeredListService = useBestListService(schema.dataSource.list)
@@ -420,10 +418,7 @@ export function BestCrudPage({ adapter, className, layout = 'fill', tableHeight,
   const detailRequestRef = useRef<AbortController | undefined>(undefined)
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
-  const pageRef = useRef<HTMLDivElement>(null)
-  const tableRegionRef = useRef<HTMLDivElement>(null)
   const [tableRecords, setTableRecords] = useState<RecordValue[]>([])
-  const [availableTableScrollHeight, setAvailableTableScrollHeight] = useState<number>()
   const [expandedRowKeys, setExpandedRowKeys] = useState<Key[]>(
     schema.table.expandable?.defaultExpandedRowKeys ?? []
   )
@@ -679,43 +674,6 @@ export function BestCrudPage({ adapter, className, layout = 'fill', tableHeight,
     }
   }, [schema.id, searchDefaultValues, searchFieldNames, searchSchemaSignature])
 
-  useLayoutEffect(() => {
-    if (layout !== 'fill') {
-      setAvailableTableScrollHeight(undefined)
-      return
-    }
-    const page = pageRef.current
-    const tableRegion = tableRegionRef.current
-    if (!page || !tableRegion) return
-
-    const updateAvailableHeight = () => {
-      const tableBodyTop = tableRegion.querySelector('.ant-table-tbody')?.getBoundingClientRect().top
-      const paginationElement = tableRegion.querySelector('.ant-pagination') as HTMLElement | null
-      const pagination = paginationElement?.getBoundingClientRect()
-      const paginationStyle = paginationElement ? getComputedStyle(paginationElement) : undefined
-      const paginationSpacing = paginationStyle
-        ? (parseFloat(paginationStyle.marginTop) || 0) + (parseFloat(paginationStyle.marginBottom) || 0)
-        : 0
-      const regionBottom = tableRegion.getBoundingClientRect().bottom
-      if (!tableBodyTop) return
-      const nextHeight = Math.max(
-        120,
-        // Keep a small border-safe inset so the last row is not clipped by the table container.
-        Math.floor(regionBottom - tableBodyTop - (pagination?.height ?? 0) - paginationSpacing - 14)
-      )
-      setAvailableTableScrollHeight((current) => current === nextHeight ? current : nextHeight)
-    }
-
-    updateAvailableHeight()
-    if (typeof ResizeObserver === 'undefined') return
-    // The available height belongs to the page layout, not to the table
-    // content. Observing the table region makes expanded rows feed their own
-    // height back into `scroll.y`, which can grow the scroll area indefinitely.
-    const observer = new ResizeObserver(updateAvailableHeight)
-    observer.observe(page)
-    return () => observer.disconnect()
-  }, [layout, tableRecords.length])
-
   useEffect(() => () => pageRequest.abort(), [pageRequest])
 
   const submitForm = useCallback(
@@ -787,7 +745,7 @@ export function BestCrudPage({ adapter, className, layout = 'fill', tableHeight,
     : null
 
   return (
-    <div ref={pageRef} className={`best-lowcode-page${layout === 'fill' ? ' best-lowcode-page--fill' : ''}`}>
+    <div className='best-lowcode-page'>
       {renderHeaderSlot(schema.header?.beforeSearch?.slot)}
       {useBestSearch && searchFields.length ? (
         <BestSearch
@@ -814,7 +772,7 @@ export function BestCrudPage({ adapter, className, layout = 'fill', tableHeight,
         />
       ) : null}
       {renderHeaderSlot(schema.header?.afterSearch?.slot)}
-      <div ref={tableRegionRef} className='best-lowcode-table-region'>
+      <div className='best-lowcode-table-region'>
       <BestTable<RecordValue, RecordValue>
         actionRef={actionRef}
         className={className}
@@ -864,13 +822,7 @@ export function BestCrudPage({ adapter, className, layout = 'fill', tableHeight,
         search={useBestSearch ? false : proTableSearch}
         scroll={{
           ...(schema.table.scrollX ? { x: schema.table.scrollX } : {}),
-          ...(tableHeight !== undefined
-            ? { y: tableHeight }
-            : schema.table.scrollY !== undefined
-              ? { y: schema.table.scrollY }
-              : layout === 'fill' && availableTableScrollHeight
-                ? { y: availableTableScrollHeight }
-                : {})
+          y: tableHeight
         }}
         toolBarRender={() => [
           ...(schema.toolbar?.map((action) => (

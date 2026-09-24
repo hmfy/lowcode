@@ -213,14 +213,27 @@ function createIndexTemplate(input: {
   schemaModulePath: string
   schemaVariable: string
 }) {
-  return `import 'best-lowcode-runtime/style.css'
+  return `import { useEffect, useState } from 'react'
+import 'best-lowcode-runtime/style.css'
 import { BestPage } from 'best-lowcode-runtime'
 import { ${input.registryVariable} } from './registry'
 import { ${input.schemaVariable} } from '${input.schemaModulePath}'
 
 export default function ${input.componentName}() {
+  const [tableHeight, setTableHeight] = useState(480)
+
+  useEffect(() => {
+    const updateTableHeight = () => {
+      // Adjust this calculation to the actual page header/search layout.
+      setTableHeight(Math.max(240, window.innerHeight - 360))
+    }
+    updateTableHeight()
+    window.addEventListener('resize', updateTableHeight)
+    return () => window.removeEventListener('resize', updateTableHeight)
+  }, [])
+
   return (
-    <BestPage tableHeight={480} registry={${input.registryVariable}} schema={${input.schemaVariable}} />
+    <BestPage tableHeight={tableHeight} registry={${input.registryVariable}} schema={${input.schemaVariable}} />
   )
 }
 `

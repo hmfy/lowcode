@@ -191,8 +191,6 @@ export type CrudPageSchema = {
     columns: TableColumnSchema[]
     actions?: PageActionSchema[]
     scrollX?: number
-    /** Explicit table body height override for business-owned bounded layouts. */
-    scrollY?: number
     pageSize?: number
     expandable?: TableExpandableSchema
     rowSelection?: TableRowSelectionSchema

@@ -165,7 +165,7 @@ const schema = {
 function renderPage(registry: Parameters<typeof BestProvider>[0]['registry']) {
   return render(
     <BestProvider registry={registry}>
-      <BestCrudPage schema={schema} />
+      <BestCrudPage schema={schema} tableHeight={480} />
     </BestProvider>
   )
 }
@@ -176,7 +176,7 @@ function renderSchemaPage(
 ) {
   return render(
     <BestProvider registry={registry}>
-      <BestCrudPage schema={pageSchema} />
+      <BestCrudPage schema={pageSchema} tableHeight={480} />
     </BestProvider>
   )
 }
@@ -191,62 +191,17 @@ afterEach(() => {
 })
 
 describe('BestCrudPage', () => {
-  it('uses fill layout by default', () => {
+  it('uses the business-owned table height', async () => {
     renderPage({
       listServices: { 'customer.list': vi.fn().mockResolvedValue({ items: [], total: 0 }) },
       services: { 'customer.create': vi.fn(), 'customer.update': vi.fn(), 'customer.remove': vi.fn() }
     })
 
-    expect(document.querySelector('.best-lowcode-page--fill')).toBeTruthy()
-  })
-
-  it('does not write a viewport-dependent height to the page root', async () => {
-    renderPage({
-      listServices: { 'customer.list': vi.fn().mockResolvedValue({ items: [], total: 0 }) },
-      services: { 'customer.create': vi.fn(), 'customer.update': vi.fn(), 'customer.remove': vi.fn() }
-    })
-
-    await waitFor(() => expect(spies.request).toBeTypeOf('function'))
-    const pageRoot = document.querySelector('.best-lowcode-page')
-    expect(pageRoot).toBeTruthy()
-    expect(pageRoot?.getAttribute('style') ?? '').not.toContain('height')
-  })
-
-  it('does not create a vertical table scroller for a short result page', async () => {
-    renderPage({
-      listServices: {
-        'customer.list': vi.fn().mockResolvedValue({
-          items: Array.from({ length: 4 }, (_, index) => ({ id: `customer-${index}` })),
-          total: 4
-        })
-      },
-      services: { 'customer.create': vi.fn(), 'customer.update': vi.fn(), 'customer.remove': vi.fn() }
-    })
-
-    await waitFor(() => expect(spies.tableProps?.scroll?.y).toBeUndefined())
-  })
-
-  it('does not impose a fixed vertical scroll height in auto layout', async () => {
-    renderPage({
-      listServices: {
-        'customer.list': vi.fn().mockResolvedValue({
-          items: Array.from({ length: 10 }, (_, index) => ({ id: `customer-${index}` })),
-          total: 10
-        })
-      },
-      services: { 'customer.create': vi.fn(), 'customer.update': vi.fn(), 'customer.remove': vi.fn() }
-    })
-
-    await waitFor(() => expect(spies.tableProps?.scroll?.y).toBeUndefined())
+    await waitFor(() => expect(spies.tableProps?.scroll?.y).toBe(480))
   })
 
   it('passes an explicit business-owned table scroll height to BestTable', async () => {
-    const pageSchema = {
-      ...schema,
-      table: { ...schema.table, scrollY: 480 }
-    } satisfies CrudPageSchema
-
-    renderSchemaPage(pageSchema, {
+    renderSchemaPage(schema, {
       listServices: { 'customer.list': vi.fn().mockResolvedValue({ items: [], total: 0 }) },
       services: { 'customer.create': vi.fn(), 'customer.update': vi.fn(), 'customer.remove': vi.fn() }
     })
@@ -760,6 +715,7 @@ describe('BestCrudPage', () => {
             toCreatePayload: (values) => ({ create_name: values.name }),
             toUpdatePayload: (values) => ({ update_name: values.name })
           }}
+          tableHeight={480}
           schema={pageSchema}
         />
       </BestProvider>
