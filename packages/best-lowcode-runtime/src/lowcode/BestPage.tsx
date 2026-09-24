@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { BestProvider, useBestRegistry } from '../runtime'
-import { BestCrudPage, type BestCrudPageProps } from './BestCrudPage'
+import { BestCrudPage } from './BestCrudPage'
+import type { CrudDataAdapter } from './adapter'
 import { BestTabbedPage } from './BestTabbedPage'
 import type { CrudPageSchema, TabbedPageSchema } from './schema'
 import { assertValidBestPageSchema } from './validate'
@@ -14,7 +15,7 @@ export type BestPageProps = {
   schema: BestPageSchema
   registry?: Parameters<typeof BestProvider>[0]['registry']
   theme?: Parameters<typeof BestProvider>[0]['theme']
-  adapter?: BestCrudPageProps['adapter']
+  adapter?: CrudDataAdapter
 }
 
 function BestPageContent({ className, layout, schema, adapter }: Omit<BestPageProps, 'registry' | 'theme'>) {

@@ -8,7 +8,7 @@ flowchart LR
     F -.校验/预览.-> C
   end
   subgraph RUN[运行期]
-    H[Schema] --> I[BestCrudPage]
+    H[Schema] --> I[BestPage]
     I --> J[BestProvider Registry]
     J --> K[Adapter]
     K --> L[后端 API]

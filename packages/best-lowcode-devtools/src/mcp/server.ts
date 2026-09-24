@@ -146,7 +146,7 @@ export function createBestLowcodeMcpServer(rootDir: string | undefined, adapter?
       },
       {
         name: 'best_discover_manifest',
-        description: '全项目发现 BestCrudPage，并预览可安全合并的 Manifest 候选项；不写入文件。',
+        description: '全项目发现 BestPage，并预览可安全合并的 Manifest 候选项；不写入文件。',
         inputSchema: {
           type: 'object',
           properties: { projectRoot: { type: 'string', description: '当前项目根目录（绝对路径）' } },

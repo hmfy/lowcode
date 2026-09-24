@@ -5,8 +5,8 @@ Use this reference after `workflow.md` whenever implementing or modifying BEST l
 ## Runtime ownership
 
 The visible page body and CRUD data flow must be owned by Runtime. A BEST CRUD page uses
-`BestProvider` and `BestCrudPage`; `index.tsx` only wires provider, schema, adapter, and registry.
-Do not hide `BestCrudPage`, render it off-screen, or maintain a second handwritten list/form state
+`BestPage`; `index.tsx` only wires schema, adapter, and registry.
+Do not hide `BestPage`, render it off-screen, or maintain a second handwritten list/form state
 beside it.
 
 Use these file boundaries:
@@ -84,7 +84,7 @@ represented by `openDetail`, `detail.fields`, `dataSource.detail`, `form`, `conf
 
 ## Common classifications
 
-- List, search, pagination: `native-supported` with `BestCrudPage`, `BestSearch`, `BestTable`,
+- List, search, pagination: `native-supported` with `BestPage`, `BestSearch`, `BestTable`,
   `/dataSource/list`, `/search`, and `/table`.
 - Basic detail fields: `native-supported` with `BestDetail`, `/detail/fields`, and
   `/dataSource/detail`.

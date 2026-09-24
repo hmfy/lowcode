@@ -15,8 +15,7 @@ npm install best-lowcode-runtime
 ```tsx
 import 'best-lowcode-runtime/style.css'
 import {
-  BestCrudPage,
-  BestProvider,
+  BestPage,
   CRUD_SCHEMA_ID,
   CRUD_SCHEMA_VERSION,
   type CrudPageSchema
@@ -36,11 +35,7 @@ const schema = {
 } satisfies CrudPageSchema
 
 export function CustomerPage() {
-  return (
-    <BestProvider registry={{ services: { 'customer.list': async () => ({ list: [], total: 0 }) } }}>
-      <BestCrudPage schema={schema} />
-    </BestProvider>
-  )
+  return <BestPage registry={{ services: { 'customer.list': async () => ({ list: [], total: 0 }) } }} schema={schema} />
 }
 ```
 

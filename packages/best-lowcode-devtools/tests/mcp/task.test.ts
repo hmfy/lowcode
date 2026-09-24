@@ -34,7 +34,7 @@ describe('buildAgentTask', () => {
     })
     expect(task.requiredArchitecture).toEqual({
       kind: 'best-crud',
-      component: 'BestCrudPage',
+      component: 'BestPage',
       files: [
         'apps/rps/src/pages/client-ledger/schema.ts',
         'apps/rps/src/pages/client-ledger/registry.ts',
@@ -57,7 +57,7 @@ describe('buildAgentTask', () => {
     expect(task.blockedQuestions).toEqual([])
     expect(task.questions).toEqual([])
     expect(task.acceptance).toContain(
-      '页面采用 BestProvider + BestCrudPage，并包含 schema.ts、registry.ts 与 slots/index.ts'
+      '页面采用 BestPage，并包含 schema.ts、registry.ts 与 slots/index.ts'
     )
   })
 

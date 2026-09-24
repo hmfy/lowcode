@@ -235,13 +235,46 @@ async function collectSchemaFiles(rootDir: string, config: ProjectConfig) {
   return files
 }
 
+function usesRuntimeBestPage(content: string, indexPath: string) {
+  const source = ts.createSourceFile(indexPath, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const options: ts.CompilerOptions = { jsx: ts.JsxEmit.Preserve, module: ts.ModuleKind.ESNext }
+  const host = ts.createCompilerHost(options, true)
+  const readSource = host.getSourceFile.bind(host)
+  host.getSourceFile = (path, languageVersion) => path === indexPath ? source : readSource(path, languageVersion)
+  const checker = ts.createProgram([indexPath], options, host).getTypeChecker()
+  let usesBestPage = false
+  function visit(node: ts.Node) {
+    if (usesBestPage) return
+    if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
+      const opening = ts.isJsxElement(node) ? node.openingElement : node
+      const symbol = ts.isIdentifier(opening.tagName)
+        ? checker.getSymbolAtLocation(opening.tagName)
+        : undefined
+      if (symbol?.declarations?.some((declaration) => {
+        if (!ts.isImportSpecifier(declaration)) return false
+        const importDeclaration = declaration.parent.parent.parent
+        return ts.isImportDeclaration(importDeclaration) &&
+          ts.isStringLiteral(importDeclaration.moduleSpecifier) &&
+          importDeclaration.moduleSpecifier.text === 'best-lowcode-runtime' &&
+          (declaration.propertyName?.text ?? declaration.name.text) === 'BestPage'
+      })) {
+        usesBestPage = true
+        return
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  return usesBestPage
+}
+
 async function readPageRegistry(schemaPath: string) {
   const pageDir = dirname(schemaPath)
   const registryPath = resolve(pageDir, 'registry.ts')
   const indexPath = resolve(pageDir, 'index.tsx')
   try {
     const indexContent = await readFile(indexPath, 'utf8')
-    if (!indexContent.includes('BestCrudPage')) return undefined
+    if (!usesRuntimeBestPage(indexContent, indexPath)) return undefined
     let pagePath = registryPath
     let content: string
     try {

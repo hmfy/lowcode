@@ -61,7 +61,7 @@ is not evidence that an extension is required and never authorizes a handwritten
    Runtime capability, the corresponding Schema/API, the limitation, whether a Slot can satisfy it,
    and the selected fallback.
 8. Before changing a Schema or Manifest, call `best_preview_change`. Implement the returned
-   `AgentTask`: the visible CRUD page must use `BestProvider` and `BestCrudPage`, with `schema.ts`,
+   `AgentTask`: the visible CRUD page must use `BestPage`, with `schema.ts`,
    `adapter.ts`, `registry.ts`, `index.tsx`, and `slots/index.ts` for a new page. Feature-specific
    Runtime Slots belong under the page's `slots/` directory. If MCP is unavailable, run
    `<best-cli> preview-change <target-path> --candidate-file <path> --language <auto|ts|json>` instead.

@@ -433,7 +433,7 @@ export function buildAgentTask(
         ? { kind: 'none', files: [] }
         : {
             kind: 'best-crud',
-            component: 'BestCrudPage',
+            component: 'BestPage',
             files: pageContextResult.pageContext.pageDir
               ? [
                   posix.join(pageContextResult.pageContext.pageDir, 'schema.ts'),
@@ -451,7 +451,7 @@ export function buildAgentTask(
       'MCP 配置与 Manifest 校验通过',
       ...(isInfrastructureMaintenance || isLowcodeOptOut
         ? []
-        : ['页面采用 BestProvider + BestCrudPage，并包含 schema.ts、registry.ts 与 slots/index.ts']),
+        : ['页面采用 BestPage，并包含 schema.ts、registry.ts 与 slots/index.ts']),
       ...verificationCommands
     ],
     questions

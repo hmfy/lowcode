@@ -16,7 +16,7 @@ const semanticCapabilities: RuntimeCapability[] = [
   {
     key: 'page.crud',
     label: 'CRUD 页面',
-    description: '使用 BestCrudPage 通过 Schema 声明查询区、数据表格、详情和操作。',
+    description: '使用 BestPage 通过 Schema 声明查询区、数据表格、详情和操作。',
     schemaPath: 'CrudPageSchema'
   },
   {

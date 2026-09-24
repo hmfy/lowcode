@@ -14,7 +14,6 @@ import {
   BestSearch,
   BestTable,
   BestPage,
-  BestCrudPage,
   CRUD_SCHEMA_ID,
   CRUD_SCHEMA_VERSION,
   TABBED_PAGE_SCHEMA_ID,
@@ -196,8 +195,8 @@ const tabsSchema: TabbedPageSchema = {
 
 export function PagesShowcasePage() {
   return <section><ShowcaseHeading title="页面模板组件" description="以 Schema 组合完整 CRUD 页面和标签页，使用本地模拟服务演示交互。" />
-    <ShowcaseCard className="section-card-fixed-height" title="BestPage / BestCrudPage" description="统一 Provider 边界、列表、查询、增删改查、行展开明细表和详情抽屉"><BestPage layout="fill" registry={showcaseRegistry} schema={crudSchema} /></ShowcaseCard>
-    <ShowcaseCard title="Runtime 能力全量示例" description="Mock 演示业务筛选 Slot、行选择、批量动作、查询折叠、工具栏、动态行操作和详情明细表"><BestCrudPage schema={capabilityCrudSchema} /></ShowcaseCard>
+    <ShowcaseCard className="section-card-fixed-height" title="BestPage" description="统一 Provider 边界、列表、查询、增删改查、行展开明细表和详情抽屉"><BestPage layout="fill" registry={showcaseRegistry} schema={crudSchema} /></ShowcaseCard>
+    <ShowcaseCard title="Runtime 能力全量示例" description="Mock 演示业务筛选 Slot、行选择、批量动作、查询折叠、工具栏、动态行操作和详情明细表"><BestPage layout="auto" registry={showcaseRegistry} schema={capabilityCrudSchema} /></ShowcaseCard>
     <ShowcaseCard title="BestPage / BestTabbedPage" description="统一 Provider 边界、标签页中组合 CRUD 页面与注册 Slot"><BestPage layout="auto" registry={showcaseRegistry} schema={tabsSchema} /></ShowcaseCard>
   </section>
 }

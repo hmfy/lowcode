@@ -37,9 +37,9 @@ async function createProject() {
   )
   await writeFile(
     join(page, 'index.tsx'),
-    `import { BestCrudPage, BestProvider } from 'best-lowcode-runtime'
+    `import { BestPage } from 'best-lowcode-runtime'
       import { registry } from './registry'
-      export function Page() { return <BestProvider registry={registry}><BestCrudPage schema={{} as never} /></BestProvider> }`
+      export function Page() { return <BestPage registry={registry} schema={{} as never} /> }`
   )
   await writeFile(
     join(page, 'registry.ts'),
@@ -61,6 +61,30 @@ async function createProject() {
 }
 
 describe('Manifest discovery', () => {
+  it('ignores a same-named local BestPage component', async () => {
+    const root = await createProject()
+    await writeFile(
+      join(root, 'apps/rps/src/pages/bank-accounts/index.tsx'),
+      "import { registry } from './registry'\nfunction BestPage() { return null }\nexport function Page() { return <BestPage registry={registry} schema={{} as never} /> }"
+    )
+
+    const result = await createBestLowcodeMcpService(root).discoverManifest()
+
+    expect(result.pages).toEqual([])
+  })
+
+  it('ignores a BestPage import shadowed by a local binding', async () => {
+    const root = await createProject()
+    await writeFile(
+      join(root, 'apps/rps/src/pages/bank-accounts/index.tsx'),
+      "import { BestPage } from 'best-lowcode-runtime'\nimport { registry } from './registry'\nconst LocalPage = () => null\nexport function Page() { const BestPage = LocalPage; return <BestPage registry={registry} schema={{} as never} /> }"
+    )
+
+    const result = await createBestLowcodeMcpService(root).discoverManifest()
+
+    expect(result.pages).toEqual([])
+  })
+
   it('previews the whole-project candidate without writing the Manifest', async () => {
     const root = await createProject()
     const result = await createBestLowcodeMcpService(root).discoverManifest()

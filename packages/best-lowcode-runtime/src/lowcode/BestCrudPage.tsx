@@ -27,6 +27,7 @@ import {
   removeCrudRecord,
   toBestListQuery
 } from './runtime'
+import type { CrudDataAdapter } from './adapter'
 import type {
   CrudPageSchema,
   DetailFieldSchema,
@@ -40,19 +41,12 @@ import { assertValidCrudPageSchema } from './validate'
 
 type RecordValue = Record<string, unknown>
 
-export type BestCrudPageProps = {
+type BestCrudPageProps = {
   className?: string
   /** `fill` consumes the bounded Runtime page host and gives the table its remaining height. */
   layout?: 'auto' | 'fill'
   schema: CrudPageSchema
   adapter?: CrudDataAdapter
-}
-
-export type CrudDataAdapter = {
-  fromList?: (records: RecordValue[]) => RecordValue[]
-  fromDetail?: (record: RecordValue) => RecordValue
-  toCreatePayload?: (values: RecordValue) => RecordValue
-  toUpdatePayload?: (values: RecordValue, record?: RecordValue) => RecordValue
 }
 
 type DrawerState = { mode: 'closed' } | { mode: 'detail' | 'edit' | 'create'; record?: RecordValue }

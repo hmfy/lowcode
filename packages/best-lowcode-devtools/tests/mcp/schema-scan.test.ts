@@ -43,7 +43,7 @@ export async function viewTransactions() { return undefined }
   )
   await writeFile(
     join(root, 'apps/rps/src/pages/client-ledger/index.tsx'),
-    "import { BestCrudPage, BestProvider } from 'best-lowcode-runtime'\nimport { clientLedgerRegistry } from './registry'\nimport { pageSchema } from './schema'\nexport function ClientLedgerPage() { return <BestProvider registry={clientLedgerRegistry}><BestCrudPage schema={pageSchema} /></BestProvider> }\n"
+    "import { BestPage } from 'best-lowcode-runtime'\nimport { clientLedgerRegistry } from './registry'\nimport { pageSchema } from './schema'\nexport function ClientLedgerPage() { return <BestPage registry={clientLedgerRegistry} schema={pageSchema} /> }\n"
   )
   await writeFile(
     join(root, 'apps/rps/src/routes.tsx'),
@@ -94,6 +94,36 @@ export const pageSchema = {
 }
 
 describe('TypeScript schema verification', () => {
+  it('rejects a same-named local BestPage component', async () => {
+    const root = await createProject(schemaWith(''))
+    await writeFile(
+      join(root, 'apps/rps/src/pages/client-ledger/index.tsx'),
+      "import { clientLedgerRegistry } from './registry'\nimport { pageSchema } from './schema'\nfunction BestPage() { return null }\nexport function ClientLedgerPage() { return <BestPage registry={clientLedgerRegistry} schema={pageSchema} /> }\n"
+    )
+
+    const result = await createBestLowcodeMcpService(root, bestLowcodeAdapter).verify()
+
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'architecture.component.missing' })
+    )
+  })
+
+  it('rejects a BestPage import shadowed by a local binding', async () => {
+    const root = await createProject(schemaWith(''))
+    await writeFile(
+      join(root, 'apps/rps/src/pages/client-ledger/index.tsx'),
+      "import { BestPage } from 'best-lowcode-runtime'\nimport { clientLedgerRegistry } from './registry'\nimport { pageSchema } from './schema'\nconst LocalPage = () => null\nexport function ClientLedgerPage() { const BestPage = LocalPage; return <BestPage registry={clientLedgerRegistry} schema={pageSchema} /> }\n"
+    )
+
+    const result = await createBestLowcodeMcpService(root, bestLowcodeAdapter).verify()
+
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'architecture.component.missing' })
+    )
+  })
+
   it('recognizes Runtime source by package identity instead of its directory name', async () => {
     const root = await createRuntimeSourceProject('vendor/embedded-runtime')
     const result = await createBestLowcodeMcpService(root, bestLowcodeAdapter).verify()
@@ -259,11 +289,11 @@ function unrelatedHelper() {
     )
   })
 
-  it('rejects a hidden BestCrudPage without coupling validation to a UI library', async () => {
+  it('rejects a hidden BestPage without coupling validation to a UI library', async () => {
     const root = await createProject(schemaWith(''))
     await writeFile(
       join(root, 'apps/rps/src/pages/client-ledger/index.tsx'),
-      "import { Table } from 'antd'\nimport { BestCrudPage, BestProvider } from 'best-lowcode-runtime'\nexport function ClientLedgerPage() { return <BestProvider><div aria-hidden><BestCrudPage schema={{} as never} /></div><Table columns={[]} /></BestProvider> }\n"
+      "import { Table } from 'antd'\nimport { BestPage } from 'best-lowcode-runtime'\nexport function ClientLedgerPage() { return <div aria-hidden><BestPage registry={{}} schema={{} as never} /></div><Table columns={[]} /> }\n"
     )
     const result = await createBestLowcodeMcpService(root, bestLowcodeAdapter).verify()
 
@@ -311,7 +341,7 @@ export const ledgerTabsSchema = {
     )
     await writeFile(
       join(root, 'apps/rps/src/pages/client-ledger/index.tsx'),
-      "import { BestProvider, BestTabbedPage } from 'best-lowcode-runtime'\nimport { clientLedgerRegistry } from './registry'\nimport { ledgerTabsSchema } from './schema'\nexport function ClientLedgerPage() { return <BestProvider registry={clientLedgerRegistry}><BestTabbedPage schema={ledgerTabsSchema} /></BestProvider> }\n"
+      "import { BestPage } from 'best-lowcode-runtime'\nimport { clientLedgerRegistry } from './registry'\nimport { ledgerTabsSchema } from './schema'\nexport function ClientLedgerPage() { return <BestPage registry={clientLedgerRegistry} schema={ledgerTabsSchema} /> }\n"
     )
 
     await expect(
@@ -323,7 +353,7 @@ export const ledgerTabsSchema = {
     const root = await createProject(schemaWith(''))
     await writeFile(
       join(root, 'apps/rps/src/pages/client-ledger/index.tsx'),
-      "import { BestCrudPage, BestProvider } from 'best-lowcode-runtime'\nimport { pageSchema } from './schema'\nexport function ClientLedgerPage() { return <BestProvider registry={{}}><BestCrudPage schema={pageSchema} /></BestProvider> }\n"
+      "import { BestPage } from 'best-lowcode-runtime'\nimport { pageSchema } from './schema'\nexport function ClientLedgerPage() { return <BestPage registry={{}} schema={pageSchema} /> }\n"
     )
 
     const result = await createBestLowcodeMcpService(root, bestLowcodeAdapter).verify()
@@ -338,7 +368,7 @@ export const ledgerTabsSchema = {
     const root = await createProject(schemaWith(''))
     await writeFile(
       join(root, 'apps/rps/src/pages/client-ledger/index.tsx'),
-      "import { BestCrudPage, BestProvider } from 'best-lowcode-runtime'\nimport { clientLedgerRegistry } from './registry'\nimport { pageSchema } from './schema'\nexport function ClientLedgerPage() { return <><BestProvider registry={clientLedgerRegistry} /><BestCrudPage schema={pageSchema} /></> }\n"
+      "import { BestPage } from 'best-lowcode-runtime'\nimport { clientLedgerRegistry } from './registry'\nimport { pageSchema } from './schema'\nexport function ClientLedgerPage() { return <BestPage schema={pageSchema} /> }\n"
     )
 
     const result = await createBestLowcodeMcpService(root, bestLowcodeAdapter).verify()
@@ -414,7 +444,7 @@ export const badRegistry = { listServices: {} }
     )
     await writeFile(
       join(root, 'apps/rps/src/pages/client-ledger/index.tsx'),
-      "import { BestCrudPage, BestProvider } from 'best-lowcode-runtime'\nimport { badRegistry, goodRegistry } from './registry'\nimport { pageSchema } from './schema'\nexport function ClientLedgerPage() { return <><BestProvider registry={goodRegistry}><BestCrudPage schema={pageSchema} /></BestProvider><BestProvider registry={badRegistry}><BestCrudPage schema={pageSchema} /></BestProvider></> }\n"
+      "import { BestPage } from 'best-lowcode-runtime'\nimport { badRegistry, goodRegistry } from './registry'\nimport { pageSchema } from './schema'\nexport function ClientLedgerPage() { return <><BestPage registry={goodRegistry} schema={pageSchema} /><BestPage registry={badRegistry} schema={pageSchema} /></> }\n"
     )
 
     const result = await createBestLowcodeMcpService(root, bestLowcodeAdapter).verify()
@@ -464,7 +494,7 @@ export const ledgerTabsSchema = {
     )
     await writeFile(
       join(root, 'apps/rps/src/pages/client-ledger/index.tsx'),
-      "import { BestProvider, BestTabbedPage } from 'best-lowcode-runtime'\nimport { clientLedgerRegistry } from './registry'\nimport { ledgerTabsSchema } from './schema'\nexport function ClientLedgerPage() { return <BestProvider registry={clientLedgerRegistry}><BestTabbedPage schema={ledgerTabsSchema} /></BestProvider> }\n"
+      "import { BestPage } from 'best-lowcode-runtime'\nimport { clientLedgerRegistry } from './registry'\nimport { ledgerTabsSchema } from './schema'\nexport function ClientLedgerPage() { return <BestPage registry={clientLedgerRegistry} schema={ledgerTabsSchema} /> }\n"
     )
     await writeFile(
       join(root, 'apps/rps/src/pages/client-ledger/registry.ts'),

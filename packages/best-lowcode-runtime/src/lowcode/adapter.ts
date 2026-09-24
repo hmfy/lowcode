@@ -1,5 +1,14 @@
 import dayjs from 'dayjs'
-import type { CrudDataAdapter } from './BestCrudPage'
+
+type RecordValue = Record<string, unknown>
+
+/** Maps application data to and from the public BestPage CRUD schema contract. */
+export type CrudDataAdapter = {
+  fromList?: (records: RecordValue[]) => RecordValue[]
+  fromDetail?: (record: RecordValue) => RecordValue
+  toCreatePayload?: (values: RecordValue) => RecordValue
+  toUpdatePayload?: (values: RecordValue, record?: RecordValue) => RecordValue
+}
 
 export type BestValueNormalizer = (value: unknown, field?: string) => unknown
 

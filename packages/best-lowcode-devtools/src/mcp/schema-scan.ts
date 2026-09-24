@@ -49,43 +49,26 @@ function scanPageArchitecture(content: string, fileName: string) {
     true,
     ts.ScriptKind.TSX
   )
-  let hasProvider = false
+  const checker = createTypeChecker(source, fileName)
   let hasBestPage = false
-  let hasCrudPage = false
-  let hasTabbedPage = false
   let hiddenRuntimePage = false
   function visit(node: ts.Node, hiddenAncestor = false) {
     if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
       const opening = ts.isJsxElement(node) ? node.openingElement : node
       const name = jsxName(opening.tagName)
       const hidden = hiddenAncestor || hasHiddenAttribute(opening)
-      if (name === 'BestProvider') hasProvider = true
-      if (name === 'BestPage') hasBestPage = true
-      if (name === 'BestCrudPage') {
-        hasCrudPage = true
-        hiddenRuntimePage ||= hidden
-      }
-      if (name === 'BestTabbedPage') {
-        hasTabbedPage = true
-        hiddenRuntimePage ||= hidden
-      }
+      if (isRuntimeJsxComponent(opening, checker, 'BestPage')) hasBestPage = true
+      if (isRuntimeJsxComponent(opening, checker, 'BestPage')) hiddenRuntimePage ||= hidden
       ts.forEachChild(node, (child) => visit(child, hidden))
       return
     }
     ts.forEachChild(node, (child) => visit(child, hiddenAncestor))
   }
   visit(source)
-  return { hasProvider, hasBestPage, hasCrudPage, hasTabbedPage, hiddenRuntimePage }
+  return { hasBestPage, hiddenRuntimePage }
 }
 
-function schemaRuntimeComponent(schema: StaticSchemaValue): RuntimePageComponent {
-  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return 'BestCrudPage'
-  return schema.kind === 'tabs' || schema.$schema === 'https://best.dev/schema/tabs/v1'
-    ? 'BestTabbedPage'
-    : 'BestCrudPage'
-}
-
-type RuntimePageComponent = 'BestPage' | 'BestCrudPage' | 'BestTabbedPage'
+type RuntimePageComponent = 'BestPage'
 
 type RegistryKeyBindings = {
   listServices: Map<string, ts.Expression>
@@ -150,6 +133,35 @@ function moduleImportBindings(source: ts.SourceFile, modulePath: string) {
   return bindings
 }
 
+function createTypeChecker(source: ts.SourceFile, fileName: string) {
+  const options: ts.CompilerOptions = { jsx: ts.JsxEmit.Preserve, module: ts.ModuleKind.ESNext }
+  const host = ts.createCompilerHost(options, true)
+  const readSource = host.getSourceFile.bind(host)
+  host.getSourceFile = (path, languageVersion) => path === fileName ? source : readSource(path, languageVersion)
+  return ts.createProgram([fileName], options, host).getTypeChecker()
+}
+
+function isRuntimeJsxComponent(
+  opening: ts.JsxOpeningLikeElement,
+  checker: ts.TypeChecker,
+  exportedName: string
+) {
+  if (!ts.isIdentifier(opening.tagName)) return false
+  const symbol = checker.getSymbolAtLocation(opening.tagName)
+  return Boolean(
+    symbol?.declarations?.some((declaration) => {
+      if (!ts.isImportSpecifier(declaration)) return false
+      const importDeclaration = declaration.parent.parent.parent
+      return (
+        ts.isImportDeclaration(importDeclaration) &&
+        ts.isStringLiteral(importDeclaration.moduleSpecifier) &&
+        importDeclaration.moduleSpecifier.text === RUNTIME_PACKAGE_NAME &&
+        (declaration.propertyName?.text ?? declaration.name.text) === exportedName
+      )
+    })
+  )
+}
+
 function jsxAttributeExpression(opening: ts.JsxOpeningLikeElement, attributeName: string) {
   for (const attribute of opening.attributes.properties) {
     if (!ts.isJsxAttribute(attribute)) continue
@@ -177,6 +189,7 @@ function validateIndexBindings(
   const source = ts.createSourceFile(indexPath, indexContent, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
   const schemaBindings = moduleImportBindings(source, './schema')
   const registryImportBindings = moduleImportBindings(source, './registry')
+  const checker = createTypeChecker(source, indexPath)
   let schemaBound = false
   let runtimeBound = false
   let hasUnboundRuntime = false
@@ -190,13 +203,13 @@ function validateIndexBindings(
       const opening = ts.isJsxElement(node) ? node.openingElement : node
       const name = jsxName(opening.tagName)
       const nextProviderRegistry =
-        name === 'BestProvider'
+        isRuntimeJsxComponent(opening, checker, 'BestProvider')
           ? importedBinding(jsxAttributeExpression(opening, 'registry'), registryImportBindings)
           : providerRegistry
-      const pageRegistry = name === 'BestPage'
+      const pageRegistry = isRuntimeJsxComponent(opening, checker, 'BestPage')
         ? importedBinding(jsxAttributeExpression(opening, 'registry'), registryImportBindings)
         : undefined
-      if (name === expectedComponent) {
+      if (isRuntimeJsxComponent(opening, checker, 'BestPage')) {
         if (isImportedIdentifier(jsxAttributeExpression(opening, 'schema'), schemaBindings)) {
           schemaBound = true
           if (pageRegistry || nextProviderRegistry) {
@@ -228,7 +241,7 @@ function validateIndexBindings(
       diagnostic(
         'error',
         'architecture.registry.unbound',
-        `${expectedComponent} 必须作为引用 ./registry 的 BestProvider 后代渲染。`,
+        `${expectedComponent} 必须通过 registry 属性或上层 BestProvider 引用 ./registry。`,
         relativePath
       )
     )
@@ -762,11 +775,6 @@ export async function scanTypeScriptSchemas(
     const result = parseStaticCrudSchemas(content, relativePath)
     diagnostics.push(...result.diagnostics)
     const schemas = result.schemas
-    const schemaComponent = schemas.some(
-      (schema) => schemaRuntimeComponent(schema) === 'BestTabbedPage'
-    )
-      ? 'BestTabbedPage'
-      : 'BestCrudPage'
     for (const required of isRuntimeSource ? [] : [indexPath]) {
       try {
         await access(required)
@@ -776,7 +784,7 @@ export async function scanTypeScriptSchemas(
           diagnostic(
             'error',
             'architecture.file.missing',
-            `BEST CRUD 页面缺少必需文件：${requiredName}。必须使用 BestCrudPage + schema.ts + registry.ts 链路，不能降级为组件库实现。`,
+            `BEST CRUD 页面缺少必需文件：${requiredName}。必须使用 BestPage + schema.ts + registry.ts 链路，不能降级为组件库实现。`,
             relative(rootDir, required).split(sep).join('/')
           )
         )
@@ -786,21 +794,13 @@ export async function scanTypeScriptSchemas(
       if (isRuntimeSource) throw new Error('runtime source is not a page')
       const indexContent = await readFile(indexPath, 'utf8')
       const architecture = scanPageArchitecture(indexContent, relativePath)
-      const expectedComponent: RuntimePageComponent = architecture.hasBestPage
-        ? 'BestPage'
-        : schemaComponent
-      const hasExpectedComponent =
-        expectedComponent === 'BestPage'
-          ? architecture.hasBestPage
-          : expectedComponent === 'BestTabbedPage'
-            ? architecture.hasTabbedPage
-            : architecture.hasCrudPage
-      if (!hasExpectedComponent || (expectedComponent !== 'BestPage' && !architecture.hasProvider)) {
+      const expectedComponent: RuntimePageComponent = 'BestPage'
+      if (!architecture.hasBestPage) {
         diagnostics.push(
           diagnostic(
             'error',
             'architecture.component.missing',
-            `BEST 页面入口必须渲染 ${expectedComponent === 'BestPage' ? 'BestPage' : `BestProvider 与 ${expectedComponent}`}，禁止使用常规组件库页面替代。`,
+            'BEST 页面入口必须渲染 BestPage，禁止使用常规组件库页面替代。',
             relative(rootDir, indexPath).split(sep).join('/')
           )
         )
@@ -866,7 +866,7 @@ export async function scanTypeScriptSchemas(
             hasInlineRegistry ? 'architecture.registry.migrate' : 'architecture.file.missing',
             hasInlineRegistry
               ? '检测到 index.tsx 内联 registry；新页面应使用独立 registry.ts，存量页面请在下一次业务修改时迁移。'
-              : 'BEST CRUD 页面缺少必需文件：registry.ts。必须使用 BestCrudPage + schema.ts + registry.ts 链路。',
+              : 'BEST CRUD 页面缺少必需文件：registry.ts。必须使用 BestPage + schema.ts + registry.ts 链路。',
             relative(rootDir, hasInlineRegistry ? indexPath : registryPath)
               .split(sep)
               .join('/')

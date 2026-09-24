@@ -57,7 +57,7 @@ export type AgentTask = {
   }
   requiredArchitecture: {
     kind: 'best-crud' | 'none'
-    component?: 'BestCrudPage'
+    component?: 'BestPage'
     files: string[]
   }
   requirementCoverage: RequirementCoverage[]
