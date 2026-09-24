@@ -220,7 +220,7 @@ import { ${input.schemaVariable} } from '${input.schemaModulePath}'
 
 export default function ${input.componentName}() {
   return (
-    <BestPage registry={${input.registryVariable}} schema={${input.schemaVariable}} />
+    <BestPage tableHeight={480} registry={${input.registryVariable}} schema={${input.schemaVariable}} />
   )
 }
 `
