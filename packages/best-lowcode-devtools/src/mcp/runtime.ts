@@ -1,12 +1,11 @@
 import { access, readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { satisfies } from 'semver'
 import { dirname, isAbsolute, relative, resolve } from 'node:path'
+import { satisfies } from 'semver'
 import { diagnostic } from './diagnostics'
 import type { Diagnostic } from './types'
 
 const RUNTIME_PACKAGE = 'best-lowcode-runtime'
-export const SUPPORTED_RUNTIME = '>=0.2.3 <0.3.0'
 
 type PackageJson = {
   version?: string
@@ -70,9 +69,6 @@ async function inspectDependencies(directory: string, rootDir: string): Promise<
   let runtime: PackageJson
   try { runtime = await installedPackage(directory, RUNTIME_PACKAGE) } catch {
     return [await fail('runtime.notInstalled', '项目声明了 Runtime，但无法解析其安装文件', [RUNTIME_PACKAGE])]
-  }
-  if (!runtime.version || !satisfies(runtime.version, SUPPORTED_RUNTIME)) {
-    return [await fail('runtime.incompatible', `Runtime ${runtime.version ?? '未知版本'} 不兼容，工具支持 ${SUPPORTED_RUNTIME}`, [`${RUNTIME_PACKAGE}@\"${SUPPORTED_RUNTIME}\"`])]
   }
   const diagnostics: Diagnostic[] = []
   for (const [name, range] of Object.entries(runtime.peerDependencies ?? {})) {

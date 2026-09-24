@@ -65,11 +65,11 @@ describe('project runtime diagnostics', () => {
     })])
   })
 
-  it('checks Runtime compatibility and its installed peer versions', async () => {
+  it('checks Runtime installation and its installed peer versions', async () => {
     const root = await mkdtemp(join(tmpdir(), 'best-lowcode-runtime-'))
     await writeFile(join(root, 'package.json'), JSON.stringify({ dependencies: { 'best-lowcode-runtime': '*' } }))
     await installFixturePackage(root, 'best-lowcode-runtime', '1.0.0')
-    expect(await checkProjectRuntime(root)).toEqual([expect.objectContaining({ code: 'runtime.incompatible' })])
+    expect(await checkProjectRuntime(root)).toEqual([])
     await installFixturePackage(root, 'best-lowcode-runtime', '0.2.4', {
       peerDependencies: { react: '^19.0.0', antd: '^6.0.0', optional: '*' },
       peerDependenciesMeta: { optional: { optional: true } }
@@ -80,6 +80,7 @@ describe('project runtime diagnostics', () => {
     await installFixturePackage(root, 'antd', '6.2.1')
     expect(await checkProjectRuntime(root)).toEqual([])
   })
+
 
   it('resolves an import-only Runtime without loading its UI code', async () => {
     const root = await mkdtemp(join(tmpdir(), 'best-lowcode-runtime-'))
