@@ -15,6 +15,7 @@ const spies = vi.hoisted(() => ({
   actionContext: undefined as undefined | Record<string, unknown>,
   slotContext: undefined as undefined | Record<string, unknown>,
   tableProps: undefined as undefined | {
+    search?: { collapsed?: boolean; defaultCollapsed?: boolean; collapseRender?: false | ((collapsed: boolean) => string) }
     expandable?: { childrenColumnName?: string; columnWidth?: number; defaultExpandAllRows?: boolean; indentSize?: number; expandedRowKeys?: unknown[]; columnTitle?: ReactNode; onExpandedRowsChange?: (keys: unknown[]) => void; expandedRowRender?: (record: Record<string, unknown>) => ReactNode }
     rowSelection?: { type?: string; checkStrictly?: boolean; selectedRowKeys?: unknown[]; onChange?: (keys: unknown[], rows?: Record<string, unknown>[]) => void }
     scroll?: { x?: number; y?: number }
@@ -82,7 +83,8 @@ vi.mock('../src/ui', () => ({
     toolBarRender,
     expandable,
     rowSelection,
-    scroll
+    scroll,
+    search
   }: {
     actionRef: { current?: { reload: () => void } }
     columns: TableColumn[]
@@ -91,9 +93,10 @@ vi.mock('../src/ui', () => ({
     expandable?: { childrenColumnName?: string; columnWidth?: number; defaultExpandAllRows?: boolean; indentSize?: number; expandedRowKeys?: unknown[]; columnTitle?: ReactNode; onExpandedRowsChange?: (keys: unknown[]) => void; expandedRowRender?: (record: Record<string, unknown>) => ReactNode }
     rowSelection?: { type?: string; checkStrictly?: boolean; selectedRowKeys?: unknown[]; onChange?: (keys: unknown[], rows?: Record<string, unknown>[]) => void }
     scroll?: { x?: number; y?: number }
+    search?: { collapsed?: boolean; defaultCollapsed?: boolean; collapseRender?: false | ((collapsed: boolean) => string) }
   }) => {
     spies.request = request
-    spies.tableProps = { expandable, rowSelection, scroll }
+    spies.tableProps = { expandable, rowSelection, scroll, search }
     useEffect(() => {
       actionRef.current = {
         reload: () => {
@@ -191,6 +194,28 @@ afterEach(() => {
 })
 
 describe('BestCrudPage', () => {
+  it.each([5, 6])('only enables ProTable collapse from six search fields (%i fields)', async (count) => {
+    renderSchemaPage({
+      ...schema,
+      searchConfig: { collapsible: true, defaultCollapsed: true },
+      search: Array.from({ length: count }, (_, index) => ({
+        field: `field${index}`, label: `条件${index}`, component: 'input' as const
+      }))
+    }, {
+      listServices: { 'customer.list': vi.fn().mockResolvedValue({ items: [], total: 0 }) },
+      services: { 'customer.create': vi.fn(), 'customer.update': vi.fn(), 'customer.remove': vi.fn() }
+    })
+
+    await waitFor(() => expect(spies.request).toBeDefined())
+    if (count < 6) {
+      expect(spies.tableProps?.search).toEqual({ collapsed: false, collapseRender: false })
+    } else {
+      expect(spies.tableProps?.search?.defaultCollapsed).toBe(true)
+      const collapseRender = spies.tableProps?.search?.collapseRender
+      expect(typeof collapseRender === 'function' && collapseRender(true)).toBe('展开')
+    }
+  })
+
   it('uses the business-owned table height', async () => {
     renderPage({
       listServices: { 'customer.list': vi.fn().mockResolvedValue({ items: [], total: 0 }) },

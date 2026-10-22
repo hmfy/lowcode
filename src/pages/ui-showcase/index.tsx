@@ -185,6 +185,27 @@ const capabilityCrudSchema: CrudPageSchema = {
   }
 }
 
+const inlineCrudSchema: CrudPageSchema = {
+  ...crudSchema,
+  id: 'ui-showcase-inline-detail',
+  title: '成员',
+  dataSource: { list: 'showcase.people', detail: 'showcase.detail' },
+  form: undefined,
+  table: {
+    ...crudSchema.table,
+    expandable: undefined,
+    actions: [{ id: 'detail', label: '详情', effect: 'openDetail' }]
+  },
+  toolbar: [{ id: 'closeDetail', label: '收起详情', effect: 'closeDetail', buttonType: 'default' }],
+  detail: {
+    mode: 'inline',
+    sections: [
+      { key: 'member', title: '成员详情（列表下方）', variant: 'card', fields: crudSchema.detail?.fields },
+      ...(capabilityCrudSchema.detail?.sections ?? [])
+    ]
+  }
+}
+
 const tabsSchema: TabbedPageSchema = {
   $schema: TABBED_PAGE_SCHEMA_ID, version: TABBED_PAGE_SCHEMA_VERSION, id: 'ui-showcase-tabs', kind: 'tabs',
   tabs: [
@@ -197,6 +218,7 @@ export function PagesShowcasePage() {
   return <section><ShowcaseHeading title="页面模板组件" description="以 Schema 组合完整 CRUD 页面和标签页，使用本地模拟服务演示交互。" />
     <ShowcaseCard className="section-card-fixed-height" title="BestPage" description="统一 Provider 边界、列表、查询、增删改查、行展开明细表和详情抽屉"><BestPage tableHeight={480} registry={showcaseRegistry} schema={crudSchema} /></ShowcaseCard>
     <ShowcaseCard title="Runtime 能力全量示例" description="Mock 演示业务筛选 Slot、行选择、批量动作、查询折叠、工具栏、动态行操作和详情明细表"><BestPage tableHeight={480} registry={showcaseRegistry} schema={capabilityCrudSchema} /></ShowcaseCard>
+    <ShowcaseCard title="Inline 详情（列表下方）" description="点击某行详情，在整个列表下方查看成员信息和参与项目；点击另一行切换，点击收起详情关闭"><BestPage tableHeight={280} registry={showcaseRegistry} schema={inlineCrudSchema} /></ShowcaseCard>
     <ShowcaseCard title="BestPage / BestTabbedPage" description="统一 Provider 边界、标签页中组合 CRUD 页面与注册 Slot"><BestPage tableHeight={480} registry={showcaseRegistry} schema={tabsSchema} /></ShowcaseCard>
   </section>
 }

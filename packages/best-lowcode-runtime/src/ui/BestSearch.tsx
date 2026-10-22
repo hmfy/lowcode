@@ -208,6 +208,8 @@ function BestSearchBody({
 }: Omit<BestSearchProps, 'defaultValues'> & { initialValues: Record<string, unknown> }) {
   const [form] = Form.useForm()
   const [collapsed, setCollapsed] = useState(collapsible && defaultCollapsed)
+  const visibleFields = fields.filter((field) => !field.hidden)
+  const canCollapse = Boolean(collapsible) && visibleFields.length >= 6 && visibleFields.length > collapseAfter
   const valueSignatureRef = useRef<string | undefined>(undefined)
   const controlledRef = useRef(false)
 
@@ -237,9 +239,8 @@ function BestSearchBody({
       className='best-lowcode-search'
     >
       <Row gutter={16} align='bottom'>
-        {fields
-          .filter((field) => !field.hidden)
-          .filter((_, index) => !collapsed || index < collapseAfter)
+        {visibleFields
+          .filter((_, index) => !canCollapse || !collapsed || index < collapseAfter)
           .map((field) => (
             <Col key={field.field} span={field.span ?? 6}>
               <Form.Item label={field.label} name={field.field} rules={toAntRules(field.rules)}>
@@ -264,7 +265,7 @@ function BestSearchBody({
               重置
             </Button>
             {extra}
-            {collapsible && fields.filter((field) => !field.hidden).length > collapseAfter ? (
+            {canCollapse ? (
               <Button type='link' onClick={() => setCollapsed((value) => !value)}>
                 {collapsed ? '展开' : '收起'}
               </Button>
