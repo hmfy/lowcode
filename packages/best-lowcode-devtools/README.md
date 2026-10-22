@@ -11,9 +11,11 @@ the installer Skill assets:
 
 ## Commands
 
-All commands write structured JSON to stdout.
+Operation commands write structured JSON to stdout. `best --version` (or `best -v`) prints
+`best-lowcode-devtools <version>` and works outside a configured project.
 
 ```bash
+best --version
 best init [options]
 best get-context
 best validate-selection <request> --related-capabilities <json-array> --allowed-paths <json-array> [--target-page-dir <path>]

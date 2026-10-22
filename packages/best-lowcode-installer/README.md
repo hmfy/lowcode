@@ -8,7 +8,15 @@ npx -y best-lowcode-installer
 ```
 
 The installer prints line-based progress for DevTools installation, host detection, and each
-Skill/MCP configuration step, then prints the full JSON result for scripting.
+Skill/MCP configuration step, then prints the full JSON result for scripting, including
+`installerVersion` and the actual installed `devtoolsVersion` when available.
+
+Check versions without running an installation:
+
+```bash
+npx -y best-lowcode-installer --version # also supports -v
+~/.best-lowcode/bin/best --version     # also supports -v
+```
 
 The installer uses `npm install --global --prefix ~/.best-lowcode` for every environment,
 including when Volta is installed. This does not require write access to npm's system-wide global

@@ -11,6 +11,10 @@ import {
   type HostDetector
 } from '../src'
 
+const { version: installerVersion } = JSON.parse(
+  await readFile(new URL('../package.json', import.meta.url), 'utf8')
+) as { version: string }
+
 const skillSource = join(process.cwd(), 'assets', 'skill')
 const userDevtoolsPrefix = (homeDir: string) => join(homeDir, '.best-lowcode')
 
@@ -307,7 +311,7 @@ describe('best-lowcode-installer', () => {
     expect(cursorConfigFallback).toBe(true)
     expect(stdout).toEqual([
       '[best-lowcode] 1/3 正在安装全局 DevTools（latest）…\n',
-      '{\n  "ok": true,\n  "devtools": "installed",\n  "hosts": []\n}\n'
+      `${JSON.stringify({ ok: true, devtools: 'installed', hosts: [], installerVersion }, null, 2)}\n`
     ])
   })
 
@@ -386,5 +390,29 @@ describe('best-lowcode-installer', () => {
     expect(calls).toEqual([
       ['npm', ['install', '--global', '--prefix', userDevtoolsPrefix(homeDir), '--prefer-online', `${DEVTOOLS_PACKAGE}@latest`]]
     ])
+  })
+})
+
+describe('installer version', () => {
+  it.each([['--version'], ['-v'], ['install', '--version']])('prints its own version without installing (%s)', async (...args) => {
+    const stdout: string[] = []
+    const stderr: string[] = []
+    const install = vi.fn()
+    await expect(runInstallerCli(args, {
+      stdout: (value) => stdout.push(value),
+      stderr: (value) => stderr.push(value)
+    }, install)).resolves.toBe(0)
+    expect(stdout).toEqual([`best-lowcode-installer ${installerVersion}\n`])
+    expect(stderr).toEqual([])
+    expect(install).not.toHaveBeenCalled()
+  })
+
+  it('includes installer and installed DevTools versions in the installation summary', async () => {
+    const stdout: string[] = []
+    await expect(runInstallerCli([], {
+      stdout: (value) => stdout.push(value),
+      stderr: () => undefined
+    }, async () => ({ ok: true, devtools: 'installed', devtoolsVersion: '2.3.4', hosts: [] }))).resolves.toBe(0)
+    expect(JSON.parse(stdout[0])).toMatchObject({ installerVersion, devtoolsVersion: '2.3.4' })
   })
 })

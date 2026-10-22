@@ -17,6 +17,18 @@ function createIo() {
 }
 
 describe('best CLI', () => {
+  it.each(['--version', '-v'])('prints the package version for %s without project discovery', async (flag) => {
+    const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
+    const stdout: string[] = []
+    const stderr: string[] = []
+    await expect(runCli([flag], {
+      stdout: (value) => stdout.push(value),
+      stderr: (value) => stderr.push(value)
+    })).resolves.toBe(0)
+    expect(stdout).toEqual([`best-lowcode-devtools ${version}\n`])
+    expect(stderr).toEqual([])
+  })
+
   it('rejects the removed AGENTS.md initialization command', async () => {
     const root = await mkdtemp(join(tmpdir(), 'best-lowcode-devtools-'))
     const { io, output } = createIo()

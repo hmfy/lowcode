@@ -504,7 +504,7 @@ export async function installBestLowcode(options: InstallerOptions = {}): Promis
 
 function usage(write: (value: string) => void) {
   write(
-    'Usage:\n  npx best-lowcode-installer [install] [--devtools-version <version>] [--repair-mcp] [--cursor-config-fallback]\n'
+    'Usage:\n  npx best-lowcode-installer [install] [--devtools-version <version>] [--repair-mcp] [--cursor-config-fallback]\n  npx best-lowcode-installer --version | -v\n'
   )
 }
 
@@ -524,6 +524,13 @@ export async function runInstallerCli(
   const args = argv[0] === 'install' ? argv.slice(1) : argv
   if (args.includes('--help') || args.includes('-h')) {
     usage(io.stdout)
+    return 0
+  }
+  const { version: installerVersion } = JSON.parse(
+    await readFile(new URL('../package.json', import.meta.url), 'utf8')
+  ) as { version: string }
+  if (args.length === 1 && (args[0] === '--version' || args[0] === '-v')) {
+    io.stdout(`best-lowcode-installer ${installerVersion}\n`)
     return 0
   }
   let devtoolsVersion: string | undefined
@@ -553,6 +560,6 @@ export async function runInstallerCli(
     repairMcp,
     onProgress: (message) => io.stdout(`[best-lowcode] ${message}\n`)
   })
-  io.stdout(`${JSON.stringify(result, null, 2)}\n`)
+  io.stdout(`${JSON.stringify({ ...result, installerVersion }, null, 2)}\n`)
   return result.ok ? 0 : 1
 }

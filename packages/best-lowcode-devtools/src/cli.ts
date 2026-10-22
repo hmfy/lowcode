@@ -24,6 +24,7 @@ function usage(io: CliIo) {
   io.stderr(
     `${[
       'Usage:',
+      '  best --version | -v',
       '  best init [--allowed-paths <json-array>] [--manifest-paths <json-array>] [--verification-commands <json-array>] [--write] [--cwd <path>]',
       '  best page create <name> [--kind crud] [--dir <path>] [--title <title>] [--capability-prefix <id>] [--write] [--cwd <path>]',
       '  best get-context [--cwd <path>]',
@@ -161,6 +162,11 @@ export async function runCli(
     stderr: process.stderr.write.bind(process.stderr)
   }
 ): Promise<number> {
+  if (argv.length === 1 && (argv[0] === '--version' || argv[0] === '-v')) {
+    const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
+    io.stdout(`best-lowcode-devtools ${version}\n`)
+    return 0
+  }
   const [command, ...rawArgs] = argv
   const { cwd: explicitCwd, args: cwdArgs } = extractCwd(rawArgs)
   const args = cwdArgs
