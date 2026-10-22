@@ -648,11 +648,14 @@ export function BestCrudPage({ adapter, className, tableHeight, schema }: BestCr
   }, [allRowsExpanded, expandableKeys])
   const proTableSearch = useMemo(() => {
     if (useBestSearch || !schema.searchConfig?.collapsible) return undefined
+    if (searchFields.filter((field) => !field.hidden).length < 6) {
+      return { collapsed: false, collapseRender: false as const }
+    }
     return {
       defaultCollapsed: schema.searchConfig.defaultCollapsed,
       collapseRender: (collapsed: boolean) => (collapsed ? '展开' : '收起')
     }
-  }, [schema.searchConfig, useBestSearch])
+  }, [schema.searchConfig, searchFields, useBestSearch])
 
   useLayoutEffect(() => {
     const previous = queryStateRef.current

@@ -463,6 +463,54 @@ describe('BestForm', () => {
     )
   })
 
+  it.each([4, 5])('shows all %i search fields without a collapse control', (count) => {
+    render(
+      <BestSearch
+        fields={Array.from({ length: count }, (_, index) => ({
+          field: `field${index}`, label: `条件${index}`, component: 'input' as const
+        }))}
+        collapsible
+        defaultCollapsed
+        onSearch={() => undefined}
+      />
+    )
+    expect(screen.getAllByRole('textbox')).toHaveLength(count)
+    expect(screen.queryByRole('button', { name: /展开|收起/ })).toBeNull()
+  })
+
+  it.each([6, 7])('can collapse %i search fields to the first four and expand again', (count) => {
+    render(
+      <BestSearch
+        fields={Array.from({ length: count }, (_, index) => ({
+          field: `field${index}`, label: `条件${index}`, component: 'input' as const
+        }))}
+        collapsible
+        onSearch={() => undefined}
+      />
+    )
+    expect(screen.getAllByRole('textbox')).toHaveLength(count)
+    fireEvent.click(screen.getByRole('button', { name: '收起' }))
+    expect(screen.getAllByRole('textbox')).toHaveLength(4)
+    fireEvent.click(screen.getByRole('button', { name: '展开' }))
+    expect(screen.getAllByRole('textbox')).toHaveLength(count)
+  })
+
+  it('does not count hidden search fields toward the collapse threshold', () => {
+    render(
+      <BestSearch
+        fields={Array.from({ length: 6 }, (_, index) => ({
+          field: `field${index}`, label: `条件${index}`, component: 'input' as const,
+          hidden: index === 5
+        }))}
+        collapsible
+        defaultCollapsed
+        onSearch={() => undefined}
+      />
+    )
+    expect(screen.getAllByRole('textbox')).toHaveLength(5)
+    expect(screen.queryByRole('button', { name: /展开|收起/ })).toBeNull()
+  })
+
   it('restores BestSearch defaults on reset', async () => {
     const onChange = vi.fn()
     const onReset = vi.fn()
