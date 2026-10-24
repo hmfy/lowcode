@@ -43,8 +43,7 @@ type RecordValue = Record<string, unknown>
 
 type BestCrudPageProps = {
   className?: string
-  /** Business-owned table body height. */
-  tableHeight: number
+  tableHeight: number | 'auto' | 'natural'
   schema: CrudPageSchema
   adapter?: CrudDataAdapter
 }
@@ -364,6 +363,42 @@ function confirmAction(content: string) {
 }
 
 export function BestCrudPage({ adapter, className, tableHeight, schema }: BestCrudPageProps) {
+  const pageRef = useRef<HTMLDivElement>(null)
+  const [autoHeight, setAutoHeight] = useState(1)
+  useLayoutEffect(() => {
+    if (tableHeight !== 'auto') return
+    const page = pageRef.current
+    if (!page) return
+    let frame = 0
+    const measure = () => {
+      const region = page.querySelector<HTMLElement>('.best-lowcode-table-region')
+      const body = region?.querySelector<HTMLElement>('.ant-table-body')
+      if (!region || !body) return
+      const pagination = region.querySelector<HTMLElement>('.ant-pagination')
+      const paginationStyle = pagination ? getComputedStyle(pagination) : null
+      const paginationSpace = pagination && paginationStyle
+        ? pagination.getBoundingClientRect().height + Number.parseFloat(paginationStyle.marginTop || '0') + Number.parseFloat(paginationStyle.marginBottom || '0')
+        : 0
+      const card = body.closest<HTMLElement>('.ant-pro-card-body')
+      const cardPadding = card ? Number.parseFloat(getComputedStyle(card).paddingBottom || '0') : 0
+      const next = Math.max(1, Math.floor(region.getBoundingClientRect().bottom - body.getBoundingClientRect().top - paginationSpace - cardPadding))
+      setAutoHeight((current) => current === next ? current : next)
+    }
+    const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
+    const observer = new ResizeObserver(schedule)
+    const mutation = new MutationObserver(() => { observeChildren(); schedule() })
+    const observed = new WeakSet<Element>()
+    const observeChildren = () => {
+      for (const element of [page, ...page.querySelectorAll('.best-lowcode-search, .best-lowcode-table-region, .ant-pro-table-list-toolbar, .ant-table-header, .ant-pagination')]) {
+        if (!observed.has(element)) { observer.observe(element); observed.add(element) }
+      }
+    }
+    observeChildren()
+    mutation.observe(page, { childList: true, subtree: true })
+    window.addEventListener('resize', schedule)
+    schedule()
+    return () => { cancelAnimationFrame(frame); observer.disconnect(); mutation.disconnect(); window.removeEventListener('resize', schedule) }
+  }, [tableHeight])
   const registry = useBestRegistry()
   assertValidCrudPageSchema(schema, registry)
   const registeredListService = useBestListService(schema.dataSource.list)
@@ -748,7 +783,7 @@ export function BestCrudPage({ adapter, className, tableHeight, schema }: BestCr
     : null
 
   return (
-    <div className='best-lowcode-page'>
+    <div ref={pageRef} className={`best-lowcode-page${tableHeight === 'auto' ? ' best-lowcode-page-auto' : ''}${tableHeight === 'natural' ? ' best-lowcode-page-natural' : ''}`}>
       {renderHeaderSlot(schema.header?.beforeSearch?.slot)}
       {useBestSearch && searchFields.length ? (
         <BestSearch
@@ -825,7 +860,7 @@ export function BestCrudPage({ adapter, className, tableHeight, schema }: BestCr
         search={useBestSearch ? false : proTableSearch}
         scroll={{
           ...(schema.table.scrollX ? { x: schema.table.scrollX } : {}),
-          y: tableHeight
+          ...(tableHeight === 'natural' ? {} : { y: tableHeight === 'auto' ? autoHeight : tableHeight })
         }}
         toolBarRender={() => [
           ...(schema.toolbar?.map((action) => (

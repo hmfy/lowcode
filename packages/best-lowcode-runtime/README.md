@@ -35,7 +35,7 @@ const schema = {
 } satisfies CrudPageSchema
 
 export function CustomerPage() {
-  const tableHeight = 480 // 由业务页面根据实际容器布局计算，可使用 React state 动态更新
+  const tableHeight = 480 // 固定表体高度；也可传 auto 或 natural
   return <BestPage tableHeight={tableHeight} registry={{ services: { 'customer.list': async () => ({ list: [], total: 0 }) } }} schema={schema} />
 }
 ```
@@ -119,3 +119,5 @@ import { getBuiltinCapabilities, validateUnknownCrudPageSchema } from 'best-lowc
 发布包只包含编译后的 `dist` 与本 README。`npm pack --dry-run` 可用于在不发布的情况下检查最终包内容。
 
 本包当前标记为 `UNLICENSED`；在对外公开前，应由代码所有方确定正式许可证。
+
+`tableHeight` 支持三种模式：正数表示表体最大高度；`"auto"` 在宿主提供明确高度的容器内分配剩余空间；`"natural"` 让表格随内容自然撑开。自动模式按实际渲染的搜索区、工具栏、表头和分页测量；宿主负责提供确定的容器高度。
