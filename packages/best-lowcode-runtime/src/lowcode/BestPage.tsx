@@ -10,8 +10,8 @@ export type BestPageSchema = CrudPageSchema | TabbedPageSchema
 
 export type BestPageProps = {
   className?: string
-  /** Business-owned table body height. The value may be derived from React state. */
-  tableHeight: number
+  /** Number: fixed body height; auto: fill a height-constrained host; natural: content height. */
+  tableHeight: number | 'auto' | 'natural'
   schema: BestPageSchema
   registry?: Parameters<typeof BestProvider>[0]['registry']
   theme?: Parameters<typeof BestProvider>[0]['theme']
@@ -21,7 +21,7 @@ export type BestPageProps = {
 function BestPageContent({ className, tableHeight, schema, adapter }: Omit<BestPageProps, 'registry' | 'theme'>) {
   const registry = useBestRegistry()
   assertValidBestPageSchema(schema, registry)
-  if (!Number.isFinite(tableHeight) || tableHeight <= 0) {
+  if (typeof tableHeight === 'number' && (!Number.isFinite(tableHeight) || tableHeight <= 0)) {
     throw new Error('BestPage requires a positive finite tableHeight')
   }
   if (schema.kind === 'tabs') return <BestTabbedPage className={className} schema={schema} tableHeight={tableHeight} />

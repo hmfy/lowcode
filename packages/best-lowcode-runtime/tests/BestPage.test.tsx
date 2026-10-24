@@ -3,10 +3,10 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { useBestDictionary } from '../src/runtime'
 
-const crudPageProps = vi.hoisted(() => ({ current: undefined as { tableHeight: number } | undefined }))
+const crudPageProps = vi.hoisted(() => ({ current: undefined as { tableHeight: number | 'auto' | 'natural' } | undefined }))
 
 vi.mock('../src/lowcode/BestCrudPage', () => ({
-  BestCrudPage: (props: { tableHeight: number }) => {
+  BestCrudPage: (props: { tableHeight: number | 'auto' | 'natural' }) => {
     crudPageProps.current = props
     return <div>{useBestDictionary('first-mount.status')[0]?.label}</div>
   }
@@ -54,6 +54,11 @@ describe('BestPage', () => {
     rerender(<BestPage schema={schema} tableHeight={720} registry={registry} />)
 
     expect(crudPageProps.current?.tableHeight).toBe(720)
+  })
+
+  it.each(['auto', 'natural'] as const)('passes the %s height mode to the page', (mode) => {
+    render(<BestPage schema={schema} tableHeight={mode} registry={registry} />)
+    expect(crudPageProps.current?.tableHeight).toBe(mode)
   })
 
   it('rejects an invalid table height', () => {

@@ -7,7 +7,7 @@ import { assertValidTabbedPageSchema } from './validate'
 export type BestTabbedPageProps = {
   className?: string
   schema: TabbedPageSchema
-  tableHeight: number
+  tableHeight: number | 'auto' | 'natural'
 }
 
 /** Renders declarative tabs whose contents are either a CRUD schema or a registered slot. */
